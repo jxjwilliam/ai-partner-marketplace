@@ -35,54 +35,63 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
-  const [pendingToday, existing] = await Promise.all([
-    prisma.contactRequest.count({
-      where: {
-        requesterId: user.id,
-        status: "pending",
-        createdAt: { gte: startOfToday },
-      },
-    }),
-    prisma.contactRequest.findUnique({
-      where: {
-        postId_requesterId: { postId, requesterId: user.id },
-      },
-      select: { id: true, status: true },
-    }),
-  ]);
-
-  const allowed = canCreateUnlockRequest({
-    authorId: post.authorId,
-    requesterId: user.id,
-    message,
-    pendingToday,
-    existingStatus: existing?.status ?? null,
-    postStatus: post.status,
-  });
-  if (!allowed.ok) return error(allowed.error, 400);
-
-  const select = { id: true, status: true } as const;
-  const unlock =
-    existing?.status === "rejected"
-      ? await prisma.contactRequest.upsert({
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const [pendingToday, existing] = await Promise.all([
+        tx.contactRequest.count({
+          where: {
+            requesterId: user.id,
+            status: "pending",
+            createdAt: { gte: startOfToday },
+          },
+        }),
+        tx.contactRequest.findUnique({
           where: {
             postId_requesterId: { postId, requesterId: user.id },
           },
-          create: { postId, requesterId: user.id, message },
-          // The unique row is intentionally reopened so a rejected requester
-          // can submit a revised introduction without creating duplicates.
-          update: {
-            message,
-            status: "pending",
-            decidedAt: null,
-            createdAt: new Date(),
-          },
-          select,
-        })
-      : await prisma.contactRequest.create({
-          data: { postId, requesterId: user.id, message },
-          select,
-        });
+          select: { id: true, status: true },
+        }),
+      ]);
 
-  return NextResponse.json({ ok: true, request: unlock });
+      const allowed = canCreateUnlockRequest({
+        authorId: post.authorId,
+        requesterId: user.id,
+        message,
+        pendingToday,
+        existingStatus: existing?.status ?? null,
+        postStatus: post.status,
+      });
+      if (!allowed.ok) return allowed;
+
+      const select = { id: true, status: true } as const;
+      const unlock =
+        existing?.status === "rejected"
+          ? await tx.contactRequest.upsert({
+              where: {
+                postId_requesterId: { postId, requesterId: user.id },
+              },
+              create: { postId, requesterId: user.id, message },
+              // The unique row is intentionally reopened so a rejected requester
+              // can submit a revised introduction without creating duplicates.
+              update: {
+                message,
+                status: "pending",
+                decidedAt: null,
+                createdAt: new Date(),
+              },
+              select,
+            })
+          : await tx.contactRequest.create({
+              data: { postId, requesterId: user.id, message },
+              select,
+            });
+
+      return { ok: true as const, unlock };
+    },
+    { isolationLevel: "Serializable" },
+  );
+
+  if (!result.ok) return error(result.error, 400);
+
+  return NextResponse.json({ ok: true, request: result.unlock });
 }

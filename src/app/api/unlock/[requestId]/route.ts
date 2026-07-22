@@ -49,10 +49,14 @@ export async function POST(req: NextRequest, context: RouteContext) {
     return error("申请已处理", 409);
   }
 
-  const updated = await prisma.contactRequest.update({
-    where: { id: requestId },
+  const updated = await prisma.contactRequest.updateMany({
+    where: { id: requestId, status: "pending" },
     data: { status, decidedAt: new Date() },
-    select: { id: true, status: true },
   });
-  return NextResponse.json({ ok: true, request: updated });
+  if (updated.count === 0) return error("申请已处理", 409);
+
+  return NextResponse.json({
+    ok: true,
+    request: { id: requestId, status },
+  });
 }
