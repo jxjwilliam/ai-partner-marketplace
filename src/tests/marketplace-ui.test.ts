@@ -41,17 +41,41 @@ describe("集市首页", () => {
 });
 
 describe("帖子详情页", () => {
-  it("renders structured content, publisher details, safety copy, and unlock slot", () => {
+  it("renders structured content, publisher details, safety copy, and unlock panel", () => {
     const page = source("src/app/posts/[id]/page.tsx");
+    const panel = source("src/components/ContactUnlockPanel.tsx");
 
     expect(page).toContain("prisma.post.findUnique");
     expect(page).toContain("getSessionUser");
     expect(page).toContain("viewCount: { increment: 1 }");
     expect(page).toContain("notFound()");
-    expect(page).not.toContain("contactPrivate");
+    expect(page).toContain("shouldRevealContact");
     expect(page).toContain("POST_TYPE_LABEL");
     expect(page).toContain("发布者");
     expect(page).toContain("平台仅提供信息撮合");
     expect(page).toContain("ContactUnlockPanel");
+    expect(panel).toContain("/api/posts/");
+    expect(panel).toContain("请先登录后申请");
+    expect(panel).toContain("申请已提交，等待发布者处理");
+    expect(panel).toContain("申请未通过");
+    expect(panel).toContain("联系方式");
+  });
+});
+
+describe("个人中心", () => {
+  it("renders profile, posts, incoming decisions, and outgoing statuses", () => {
+    const page = source("src/app/me/page.tsx");
+    const dashboard = source("src/components/MeDashboard.tsx");
+
+    expect(page).toContain("getSessionUser");
+    expect(page).toContain('redirect("/login?next=/me")');
+    expect(page).toContain("shouldRevealContact");
+    expect(page).toContain("contact: reveal ? item.post.contactPrivate : undefined");
+    expect(dashboard).toContain("我的帖子");
+    expect(dashboard).toContain("联系方式申请");
+    expect(dashboard).toContain("/api/unlock/");
+    expect(dashboard).toContain("/api/posts/");
+    expect(dashboard).toContain("收到的申请");
+    expect(dashboard).toContain("发出的申请");
   });
 });

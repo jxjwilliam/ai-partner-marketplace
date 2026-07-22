@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ContactUnlockPanel from "@/components/ContactUnlockPanel";
 import { getSessionUser } from "@/lib/auth/session";
 import { POST_TYPE_LABEL } from "@/lib/constants";
 import { prisma } from "@/lib/db";
+import { shouldRevealContact } from "@/lib/posts/visibility";
 
 const BODY_LABELS: Record<string, string> = {
   projectStage: "项目阶段",
@@ -58,6 +60,7 @@ export default async function PostDetailPage({
       city: true,
       tags: true,
       bodyJson: true,
+      contactPrivate: true,
       status: true,
       createdAt: true,
       author: {
@@ -81,6 +84,24 @@ export default async function PostDetailPage({
     select: { viewCount: true },
   });
   const viewCount = updated.viewCount;
+  let unlockStatus: "pending" | "approved" | "rejected" | null = null;
+  if (viewer && viewer.id !== post.authorId) {
+    const unlock = await prisma.contactRequest.findUnique({
+      where: {
+        postId_requesterId: {
+          postId: post.id,
+          requesterId: viewer.id,
+        },
+      },
+      select: { status: true },
+    });
+    unlockStatus = unlock?.status ?? null;
+  }
+  const revealContact = shouldRevealContact({
+    viewerId: viewer?.id ?? null,
+    authorId: post.authorId,
+    unlockStatus,
+  });
 
   const body =
     post.bodyJson &&
@@ -155,16 +176,13 @@ export default async function PostDetailPage({
             </p>
           </section>
 
-          {/* Task 10: replace this slot with ContactUnlockPanel. */}
-          <section
-            className="border border-dashed border-indigo-200 bg-indigo-50 p-5"
-            data-contact-unlock-slot
-          >
-            <h2 className="font-semibold text-indigo-950">联系发布者</h2>
-            <p className="mt-2 text-sm leading-6 text-indigo-700">
-              联系方式受保护，解锁联系功能即将接入。
-            </p>
-          </section>
+          <ContactUnlockPanel
+            postId={post.id}
+            loggedIn={Boolean(viewer)}
+            isAuthor={viewer?.id === post.authorId}
+            initialStatus={unlockStatus}
+            contact={revealContact ? post.contactPrivate : undefined}
+          />
 
           <p className="border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-800">
             平台仅提供信息撮合，不对合作结果作担保。沟通时请注意保护个人信息，涉及资金与股权请自行核验并签订正式协议。
