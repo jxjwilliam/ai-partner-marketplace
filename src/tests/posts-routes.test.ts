@@ -245,4 +245,32 @@ describe("PATCH /api/posts/[id]", () => {
     expect(update.data.status).toBe("hidden");
     expect(update.data.bumpedAt).toBeInstanceOf(Date);
   });
+
+  it("lets an admin hide a post without bumping", async () => {
+    mocks.getSessionUser.mockResolvedValue({ ...viewer, isAdmin: true });
+
+    const response = await patchPost(
+      request("http://localhost/api/posts/post-1", "PATCH", {
+        status: "hidden",
+      }),
+      { params: Promise.resolve({ id: "post-1" }) },
+    );
+
+    expect(response.status).toBe(200);
+    const update = mocks.postUpdate.mock.calls[0][0];
+    expect(update.data.status).toBe("hidden");
+    expect(update.data.bumpedAt).toBeUndefined();
+  });
+
+  it("rejects admins who try to bump a post", async () => {
+    mocks.getSessionUser.mockResolvedValue({ ...viewer, isAdmin: true });
+
+    const response = await patchPost(
+      request("http://localhost/api/posts/post-1", "PATCH", { bump: true }),
+      { params: Promise.resolve({ id: "post-1" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect(mocks.postUpdate).not.toHaveBeenCalled();
+  });
 });

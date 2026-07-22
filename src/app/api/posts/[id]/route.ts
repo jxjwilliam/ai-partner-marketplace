@@ -85,12 +85,6 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     select: { authorId: true },
   });
   if (!post) return notFound();
-  if (post.authorId !== user.id && !user.isAdmin) {
-    return NextResponse.json(
-      { ok: false, error: "无权修改此信息" },
-      { status: 403 },
-    );
-  }
 
   let raw: unknown;
   try {
@@ -116,6 +110,20 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     return NextResponse.json(
       { ok: false, error: "没有可更新的内容" },
       { status: 400 },
+    );
+  }
+
+  const isAuthor = post.authorId === user.id;
+  if (bump && !isAuthor) {
+    return NextResponse.json(
+      { ok: false, error: "无权修改此信息" },
+      { status: 403 },
+    );
+  }
+  if (hide && !isAuthor && !user.isAdmin) {
+    return NextResponse.json(
+      { ok: false, error: "无权修改此信息" },
+      { status: 403 },
     );
   }
 
