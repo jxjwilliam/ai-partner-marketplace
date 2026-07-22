@@ -44,8 +44,11 @@ describe("帖子详情页", () => {
   it("renders structured content, publisher details, safety copy, and unlock slot", () => {
     const page = source("src/app/posts/[id]/page.tsx");
 
-    expect(page).toContain("prisma.post.findFirst");
+    expect(page).toContain("prisma.post.findUnique");
+    expect(page).toContain("getSessionUser");
+    expect(page).toContain("viewCount: { increment: 1 }");
     expect(page).toContain("notFound()");
+    expect(page).not.toContain("contactPrivate");
     expect(page).toContain("POST_TYPE_LABEL");
     expect(page).toContain("发布者");
     expect(page).toContain("平台仅提供信息撮合");

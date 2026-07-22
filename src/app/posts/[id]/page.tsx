@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getSessionUser } from "@/lib/auth/session";
 import { POST_TYPE_LABEL } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 
@@ -46,19 +47,44 @@ export default async function PostDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const post = await prisma.post.findFirst({
-    where: { id, status: "active" },
-    include: {
+  const viewer = await getSessionUser();
+  const post = await prisma.post.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      authorId: true,
+      type: true,
+      title: true,
+      city: true,
+      tags: true,
+      bodyJson: true,
+      status: true,
+      createdAt: true,
       author: {
         select: { nickname: true, city: true, roleTag: true, createdAt: true },
       },
     },
   });
 
-  if (!post) notFound();
+  if (
+    !post ||
+    (post.status === "hidden" &&
+      viewer?.id !== post.authorId &&
+      !viewer?.isAdmin)
+  ) {
+    notFound();
+  }
+
+  const updated = await prisma.post.update({
+    where: { id: post.id },
+    data: { viewCount: { increment: 1 } },
+  });
+  const viewCount = updated.viewCount;
 
   const body =
-    post.bodyJson && typeof post.bodyJson === "object" && !Array.isArray(post.bodyJson)
+    post.bodyJson &&
+    typeof post.bodyJson === "object" &&
+    !Array.isArray(post.bodyJson)
       ? (post.bodyJson as Record<string, unknown>)
       : {};
   const fields = Object.entries(body)
@@ -80,7 +106,7 @@ export default async function PostDetailPage({
               </span>
               <span className="text-slate-500">{post.city}</span>
               <span className="ml-auto text-xs text-slate-400">
-                {post.createdAt.toLocaleDateString("zh-CN")} · {post.viewCount} 次浏览
+                {post.createdAt.toLocaleDateString("zh-CN")} · {viewCount} 次浏览
               </span>
             </div>
             <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
