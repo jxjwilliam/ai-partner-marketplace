@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import AiPolishBlock from "@/components/AiPolishBlock";
 import { FILTER_CITIES, POST_TYPE_LABEL, TAGS } from "@/lib/constants";
 
 type PostType = "partner" | "talent" | "project" | "funding";
@@ -60,6 +61,17 @@ export default function PostForm({ defaultCity = "" }: { defaultCity?: string })
 
   function setValue(name: string, value: string) {
     setValues((current) => ({ ...current, [name]: value }));
+  }
+
+  function adoptPolished(polished: Values) {
+    if (polished.title) setTitle(polished.title);
+    setValues((current) => {
+      const next = { ...current };
+      for (const key of Object.keys(current)) {
+        if (polished[key] !== undefined) next[key] = polished[key];
+      }
+      return next;
+    });
   }
 
   function toggleTag(tag: string) {
@@ -352,6 +364,12 @@ export default function PostForm({ defaultCity = "" }: { defaultCity?: string })
           </label>
 
           {typeFields()}
+
+          <AiPolishBlock
+            type={type}
+            fields={{ title, ...values }}
+            onAdopt={adoptPolished}
+          />
 
           <fieldset>
             <legend className="text-sm font-medium text-slate-700">

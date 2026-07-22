@@ -27,4 +27,17 @@ describe("发布信息界面", () => {
     expect(form).toContain('fetch("/api/posts"');
     expect(form).toContain('window.location.assign(`/posts/${result.id}`)');
   });
+
+  it("wires AI polish into the form with adopt and discard actions", () => {
+    const form = source("src/components/PostForm.tsx");
+    const polish = source("src/components/AiPolishBlock.tsx");
+
+    expect(form).toContain('import AiPolishBlock from "@/components/AiPolishBlock"');
+    expect(form).toContain("<AiPolishBlock");
+    expect(form).toContain("onAdopt=");
+    expect(polish).toContain('fetch("/api/ai/polish"');
+    expect(polish).toContain("一键润色");
+    expect(polish).toContain("采用");
+    expect(polish).toContain("放弃");
+  });
 });
