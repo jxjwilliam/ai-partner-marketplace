@@ -1,3 +1,5 @@
+import { randomInt } from "crypto";
+
 import bcrypt from "bcryptjs";
 import {
   OTP_COOLDOWN_MS,
@@ -13,7 +15,7 @@ export function normalizePhone(phone: string): string | null {
 }
 
 export function generateOtpCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(randomInt(100000, 1000000));
 }
 
 export async function hashOtp(code: string): Promise<string> {

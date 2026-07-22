@@ -126,6 +126,8 @@ server {
 }
 ```
 
+Nginx 必须自行设置/覆盖 `X-Forwarded-For`（例如 `$remote_addr` 或 `$proxy_add_x_forwarded_for`），不可信任客户端传入的值。
+
 替换域名，检查并重载配置：
 
 ```bash
