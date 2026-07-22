@@ -44,6 +44,8 @@ model User {
   posts     Post[]
   sessions  Session[]
   unlocks   ContactRequest[] @relation("Requester")
+
+  @@map("users")
 }
 
 model OtpCode {
@@ -56,6 +58,7 @@ model OtpCode {
   ip        String?
 
   @@index([phone, createdAt])
+  @@map("otp_codes")
 }
 
 model Session {
@@ -65,6 +68,8 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("sessions")
 }
 
 model Post {
@@ -85,6 +90,7 @@ model Post {
 
   @@index([status, bumpedAt])
   @@index([type, city])
+  @@map("posts")
 }
 
 model ContactRequest {
@@ -100,4 +106,5 @@ model ContactRequest {
 
   @@unique([postId, requesterId])
   @@index([requesterId, status, createdAt])
+  @@map("contact_requests")
 }
