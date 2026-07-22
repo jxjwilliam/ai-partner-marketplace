@@ -6,9 +6,18 @@ import {
   verifyOtpHash,
 } from "@/lib/auth/otp";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
+import { OTP_MAX_ATTEMPTS } from "@/lib/constants";
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  let body: { phone?: unknown; code?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "请求格式错误" },
+      { status: 400 },
+    );
+  }
   const phone = normalizePhone(String(body.phone ?? ""));
   const code = String(body.code ?? "");
   if (!phone || !/^\d{6}$/.test(code)) {
@@ -42,17 +51,21 @@ export async function POST(request: NextRequest) {
 
   const match = await verifyOtpHash(code, otp.codeHash);
   if (!match) {
-    await prisma.otpCode.update({
-      where: { id: otp.id },
+    const incremented = await prisma.otpCode.updateMany({
+      where: { id: otp.id, attempts: { lt: OTP_MAX_ATTEMPTS } },
       data: { attempts: { increment: 1 } },
     });
     return NextResponse.json(
-      { ok: false, error: "验证码错误" },
+      {
+        ok: false,
+        error:
+          incremented.count === 0 ? "验证码错误次数过多" : "验证码错误",
+      },
       { status: 400 },
     );
   }
 
-  await prisma.otpCode.deleteMany({ where: { phone } });
+  await prisma.otpCode.delete({ where: { id: otp.id } });
 
   const adminPhones = (process.env.ADMIN_PHONES || "")
     .split(",")

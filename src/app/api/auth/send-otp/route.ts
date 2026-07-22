@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
@@ -10,7 +11,15 @@ import { sendSmsOtp } from "@/lib/auth/sms";
 import { OTP_TTL_MS } from "@/lib/constants";
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  let body: { phone?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { ok: false, error: "请求格式错误" },
+      { status: 400 },
+    );
+  }
   const phone = normalizePhone(String(body.phone ?? ""));
   if (!phone) {
     return NextResponse.json(
@@ -24,34 +33,45 @@ export async function POST(request: NextRequest) {
   const dayStart = new Date();
   dayStart.setHours(0, 0, 0, 0);
 
-  const [last, sendsPhoneToday, sendsIpToday] = await Promise.all([
-    prisma.otpCode.findFirst({
-      where: { phone },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.otpCode.count({
-      where: { phone, createdAt: { gte: dayStart } },
-    }),
-    prisma.otpCode.count({
-      where: { ip, createdAt: { gte: dayStart } },
-    }),
-  ]);
-
-  const gate = assertCanSendOtp({
-    lastSentAt: last?.createdAt ?? null,
-    sendsPhoneToday,
-    sendsIpToday,
-  });
-  if (!gate.ok) {
-    return NextResponse.json(
-      { ok: false, error: gate.error },
-      { status: 429 },
-    );
-  }
-
   const code = generateOtpCode();
+  const codeHash = await hashOtp(code);
+  let reservation:
+    | { ok: true; otpId: string }
+    | { ok: false; error: string };
   try {
-    await sendSmsOtp(phone, code);
+    reservation = await prisma.$transaction(
+      async (tx) => {
+        const [last, sendsPhoneToday, sendsIpToday] = await Promise.all([
+          tx.otpCode.findFirst({
+            where: { phone },
+            orderBy: { createdAt: "desc" },
+          }),
+          tx.otpCode.count({
+            where: { phone, createdAt: { gte: dayStart } },
+          }),
+          tx.otpCode.count({
+            where: { ip, createdAt: { gte: dayStart } },
+          }),
+        ]);
+        const gate = assertCanSendOtp({
+          lastSentAt: last?.createdAt ?? null,
+          sendsPhoneToday,
+          sendsIpToday,
+        });
+        if (!gate.ok) return gate;
+
+        const otp = await tx.otpCode.create({
+          data: {
+            phone,
+            codeHash,
+            expiresAt: new Date(Date.now() + OTP_TTL_MS),
+            ip,
+          },
+        });
+        return { ok: true as const, otpId: otp.id };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   } catch {
     return NextResponse.json(
       { ok: false, error: "服务暂不可用" },
@@ -59,14 +79,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await prisma.otpCode.create({
-    data: {
-      phone,
-      codeHash: await hashOtp(code),
-      expiresAt: new Date(Date.now() + OTP_TTL_MS),
-      ip,
-    },
-  });
+  if (!reservation.ok) {
+    return NextResponse.json(
+      { ok: false, error: reservation.error },
+      { status: 429 },
+    );
+  }
+
+  try {
+    await sendSmsOtp(phone, code);
+  } catch {
+    await prisma.otpCode
+      .delete({ where: { id: reservation.otpId } })
+      .catch(() => undefined);
+    return NextResponse.json(
+      { ok: false, error: "服务暂不可用" },
+      { status: 503 },
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }
