@@ -2,11 +2,19 @@ import type { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
-import { buildPostWhere } from "@/lib/posts/filters";
+import { buildPostWhere, isValidPostFilterType } from "@/lib/posts/filters";
 import { parsePostInput } from "@/lib/posts/schemas";
 
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
+  const type = params.get("type");
+  if (type && !isValidPostFilterType(type)) {
+    return NextResponse.json(
+      { ok: false, error: "类型无效" },
+      { status: 400 },
+    );
+  }
+
   const tags = params
     .get("tags")
     ?.split(",")
@@ -16,7 +24,7 @@ export async function GET(req: NextRequest) {
   const posts = await prisma.post.findMany({
     where: buildPostWhere({
       city: params.get("city") ?? undefined,
-      type: params.get("type") ?? undefined,
+      type: type ?? undefined,
       tags,
     }),
     orderBy: { bumpedAt: "desc" },

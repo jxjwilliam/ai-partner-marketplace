@@ -55,12 +55,12 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     unlockStatus,
   });
 
-  await prisma.post.update({
+  const updated = await prisma.post.update({
     where: { id: post.id },
     data: { viewCount: { increment: 1 } },
   });
 
-  const incrementedPost = { ...post, viewCount: post.viewCount + 1 };
+  const incrementedPost = { ...post, viewCount: updated.viewCount };
   if (reveal) {
     return NextResponse.json({ ok: true, post: incrementedPost });
   }

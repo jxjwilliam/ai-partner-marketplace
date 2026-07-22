@@ -87,6 +87,19 @@ beforeEach(() => {
 });
 
 describe("GET /api/posts", () => {
+  it("returns 400 for an invalid type filter", async () => {
+    const response = await listPosts(
+      request("http://localhost/api/posts?type=invalid"),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "类型无效",
+    });
+    expect(mocks.postFindMany).not.toHaveBeenCalled();
+  });
+
   it("lists filtered active posts without private contact details", async () => {
     const response = await listPosts(
       request(
@@ -179,6 +192,7 @@ describe("GET /api/posts/[id]", () => {
 
   it("increments views and reveals approved contact details", async () => {
     mocks.unlockFindUnique.mockResolvedValue({ status: "approved" });
+    mocks.postUpdate.mockResolvedValue({ ...post, viewCount: 99 });
 
     const response = await getPost(request("http://localhost/api/posts/post-1"), {
       params: Promise.resolve({ id: "post-1" }),
@@ -190,7 +204,7 @@ describe("GET /api/posts/[id]", () => {
     });
     const json = await response.json();
     expect(json.post.contactPrivate).toBe("微信：founder");
-    expect(json.post.viewCount).toBe(4);
+    expect(json.post.viewCount).toBe(99);
   });
 
   it("omits contact details when no approved unlock exists", async () => {

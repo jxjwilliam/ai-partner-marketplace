@@ -13,4 +13,7 @@ describe("buildPostWhere", () => {
     const w = buildPostWhere({ tags: ["Agent", "SaaS"] });
     expect(w.AND).toEqual([{ tags: { has: "Agent" } }, { tags: { has: "SaaS" } }]);
   });
+  it("ignores unknown type filters", () => {
+    expect(buildPostWhere({ type: "invalid" }).type).toBeUndefined();
+  });
 });
