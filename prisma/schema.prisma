@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleTag {
+  talent
+  founder
+  investor
+  other
+}
+
+enum PostType {
+  partner
+  talent
+  project
+  funding
+}
+
+enum PostStatus {
+  active
+  hidden
+}
+
+enum UnlockStatus {
+  pending
+  approved
+  rejected
+}
+
+model User {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  nickname  String?
+  city      String?
+  roleTag   RoleTag? @map("role_tag")
+  bio       String?
+  isAdmin   Boolean  @default(false) @map("is_admin")
+  createdAt DateTime @default(now()) @map("created_at")
+  posts     Post[]
+  sessions  Session[]
+  unlocks   ContactRequest[] @relation("Requester")
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  phone     String
+  codeHash  String   @map("code_hash")
+  expiresAt DateTime @map("expires_at")
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  ip        String?
+
+  @@index([phone, createdAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique @map("token_hash")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+}
+
+model Post {
+  id             String     @id @default(cuid())
+  authorId       String     @map("author_id")
+  author         User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  type           PostType
+  title          String
+  city           String
+  tags           String[]
+  bodyJson       Json       @map("body_json")
+  contactPrivate String     @map("contact_private")
+  status         PostStatus @default(active)
+  viewCount      Int        @default(0) @map("view_count")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  bumpedAt       DateTime   @default(now()) @map("bumped_at")
+  unlocks        ContactRequest[]
+
+  @@index([status, bumpedAt])
+  @@index([type, city])
+}
+
+model ContactRequest {
+  id          String       @id @default(cuid())
+  postId      String       @map("post_id")
+  post        Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  requesterId String       @map("requester_id")
+  requester   User         @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  message     String
+  status      UnlockStatus @default(pending)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  decidedAt   DateTime?    @map("decided_at")
+
+  @@unique([postId, requesterId])
+  @@index([requesterId, status, createdAt])
+}
