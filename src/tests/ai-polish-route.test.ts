@@ -57,6 +57,19 @@ describe("POST /api/ai/polish", () => {
     });
   });
 
+  it("rejects an invalid polish type with 400", async () => {
+    const response = await POST(
+      request({ type: "invalid", fields: { intro: "项目介绍" } }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "请求格式错误",
+    });
+    expect(mocks.polishFields).not.toHaveBeenCalled();
+  });
+
   it("returns a stable 503 response when the LLM fails", async () => {
     mocks.polishFields.mockRejectedValue(new Error("provider unavailable"));
 

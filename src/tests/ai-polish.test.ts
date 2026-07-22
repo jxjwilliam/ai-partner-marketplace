@@ -20,14 +20,52 @@ describe("sanitizePolishFields", () => {
     ).toEqual({ intro: "已完成 MVP" });
   });
 
-  it("removes fields whose value contains contact information", () => {
+  it("drops fields whose value is entirely a phone number", () => {
+    expect(
+      sanitizePolishFields({
+        intro: "已完成 MVP",
+        backup: "13800138000",
+      }),
+    ).toEqual({ intro: "已完成 MVP" });
+  });
+
+  it("drops fields whose value is entirely an email address", () => {
+    expect(
+      sanitizePolishFields({
+        intro: "已完成 MVP",
+        backup: "founder@example.com",
+      }),
+    ).toEqual({ intro: "已完成 MVP" });
+  });
+
+  it("redacts phone numbers embedded in longer strings", () => {
+    expect(
+      sanitizePolishFields({
+        intro: "如需沟通请拨打13800138000了解详情",
+      }),
+    ).toEqual({ intro: "如需沟通请拨打[已隐藏]了解详情" });
+  });
+
+  it("redacts email addresses embedded in longer strings", () => {
+    expect(
+      sanitizePolishFields({
+        team: "请发简历至founder@example.com，我们会尽快回复",
+      }),
+    ).toEqual({ team: "请发简历至[已隐藏]，我们会尽快回复" });
+  });
+
+  it("redacts wechat handles embedded in longer strings", () => {
     expect(
       sanitizePolishFields({
         intro: "联系微信 founder-wx",
         team: "邮箱 founder@example.com",
         needs: "寻找全栈开发伙伴",
       }),
-    ).toEqual({ needs: "寻找全栈开发伙伴" });
+    ).toEqual({
+      intro: "联系[已隐藏]",
+      team: "邮箱 [已隐藏]",
+      needs: "寻找全栈开发伙伴",
+    });
   });
 
   it("keeps safe copy fields unchanged", () => {

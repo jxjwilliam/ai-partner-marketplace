@@ -1,12 +1,39 @@
 const BLOCKED = /contact|phone|微信|手机|邮箱|email/i;
+const REDACTED = "[已隐藏]";
+
+const PHONE_PATTERN = /1[3-9]\d{9}/g;
+const EMAIL_PATTERN = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+const WECHAT_PATTERN =
+  /(?:wxid_[a-zA-Z0-9_-]+|(?:微信|wechat|wx)[：:\s]*[a-zA-Z][a-zA-Z0-9_-]{4,19})/gi;
+
+function isEntireContactValue(value: string): boolean {
+  const trimmed = value.trim();
+  if (/^1[3-9]\d{9}$/.test(trimmed)) return true;
+  if (/^[\w.+-]+@[\w-]+(?:\.[\w-]+)+$/.test(trimmed)) return true;
+  if (/^wxid_[a-zA-Z0-9_-]+$/i.test(trimmed)) return true;
+  if (/^(?:微信|wechat|wx)[：:\s]*[a-zA-Z][a-zA-Z0-9_-]{4,19}$/i.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
+function scrubContactPatterns(value: string): string {
+  return value
+    .replace(PHONE_PATTERN, REDACTED)
+    .replace(EMAIL_PATTERN, REDACTED)
+    .replace(WECHAT_PATTERN, REDACTED);
+}
 
 export function sanitizePolishFields(
   fields: Record<string, string>,
 ): Record<string, string> {
   const safe: Record<string, string> = {};
   for (const [key, value] of Object.entries(fields)) {
-    if (BLOCKED.test(key) || BLOCKED.test(value)) continue;
-    safe[key] = value;
+    if (BLOCKED.test(key)) continue;
+    if (isEntireContactValue(value)) continue;
+
+    const scrubbed = scrubContactPatterns(value);
+    if (scrubbed.trim()) safe[key] = scrubbed;
   }
   return safe;
 }

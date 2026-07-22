@@ -47,6 +47,14 @@ export async function POST(request: NextRequest) {
     fields: Record<string, string>;
   };
 
+  const validTypes = ["partner", "talent", "project", "funding"] as const;
+  if (!validTypes.includes(type as (typeof validTypes)[number])) {
+    return NextResponse.json(
+      { ok: false, error: "请求格式错误" },
+      { status: 400 },
+    );
+  }
+
   try {
     const polished = await polishFields(type, fields);
     return NextResponse.json({ ok: true, fields: polished });
