@@ -68,6 +68,14 @@ function malformedJsonRequest(path: string): NextRequest {
   });
 }
 
+function nullJsonBodyRequest(path: string): NextRequest {
+  return new NextRequest(`http://localhost${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "null",
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.transaction.mockImplementation(
@@ -101,6 +109,19 @@ describe("POST /api/auth/send-otp", () => {
       ok: false,
       error: "请求格式错误",
     });
+  });
+
+  it("returns a Chinese 400 response for a null JSON body", async () => {
+    const response = await sendOtp(
+      nullJsonBodyRequest("/api/auth/send-otp"),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "请求格式错误",
+    });
+    expect(mocks.otpFindFirst).not.toHaveBeenCalled();
   });
 
   it("sends and persists an OTP for a valid phone", async () => {
@@ -163,6 +184,19 @@ describe("POST /api/auth/verify-otp", () => {
     });
   });
 
+  it("returns a Chinese 400 response for a null JSON body", async () => {
+    const response = await verifyOtp(
+      nullJsonBodyRequest("/api/auth/verify-otp"),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "请求格式错误",
+    });
+    expect(mocks.otpFindFirst).not.toHaveBeenCalled();
+  });
+
   it("creates a user session after a correct OTP", async () => {
     const code = "123456";
     mocks.otpFindFirst.mockResolvedValue({
@@ -193,8 +227,10 @@ describe("POST /api/auth/verify-otp", () => {
       ok: true,
       needsOnboarding: true,
     });
-    expect(mocks.otpDelete).toHaveBeenCalledWith({ where: { id: "otp-1" } });
-    expect(mocks.otpDeleteMany).not.toHaveBeenCalled();
+    expect(mocks.otpDeleteMany).toHaveBeenCalledWith({
+      where: { id: "otp-1", attempts: { lt: 5 } },
+    });
+    expect(mocks.otpDelete).not.toHaveBeenCalled();
     expect(mocks.createSession).toHaveBeenCalledWith("user-1");
     expect(mocks.setSessionCookie).toHaveBeenCalledWith("session-token");
   });
@@ -246,6 +282,32 @@ describe("POST /api/auth/verify-otp", () => {
     expect(mocks.createSession).not.toHaveBeenCalled();
   });
 
+  it("does not create a session when a concurrent verify consumed the OTP", async () => {
+    const code = "123456";
+    mocks.otpFindFirst.mockResolvedValue({
+      id: "otp-1",
+      attempts: 0,
+      expiresAt: new Date(Date.now() + 60_000),
+      codeHash: await hashOtp(code),
+    });
+    mocks.otpDeleteMany.mockResolvedValue({ count: 0 });
+
+    const response = await verifyOtp(
+      jsonRequest("/api/auth/verify-otp", {
+        phone: "13800138000",
+        code,
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "验证码错误",
+    });
+    expect(mocks.createSession).not.toHaveBeenCalled();
+    expect(mocks.setSessionCookie).not.toHaveBeenCalled();
+  });
+
   it("preserves older sends so a later send still counts them", async () => {
     const code = "123456";
     const older = {
@@ -266,11 +328,12 @@ describe("POST /api/auth/verify-otp", () => {
     const rows = [older, matched];
     const observedCounts: number[] = [];
     mocks.otpFindFirst.mockImplementation(async () => rows.at(-1) ?? null);
-    mocks.otpDelete.mockImplementation(
+    mocks.otpDeleteMany.mockImplementation(
       async ({ where }: { where: { id: string } }) => {
         const index = rows.findIndex((row) => row.id === where.id);
-        if (index >= 0) rows.splice(index, 1);
-        return {};
+        if (index < 0) return { count: 0 };
+        rows.splice(index, 1);
+        return { count: 1 };
       },
     );
     mocks.otpCount.mockImplementation(

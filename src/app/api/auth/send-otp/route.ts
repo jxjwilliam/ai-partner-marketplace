@@ -11,7 +11,7 @@ import { sendSmsOtp } from "@/lib/auth/sms";
 import { OTP_TTL_MS } from "@/lib/constants";
 
 export async function POST(request: NextRequest) {
-  let body: { phone?: unknown };
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
@@ -20,7 +20,15 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
-  const phone = normalizePhone(String(body.phone ?? ""));
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json(
+      { ok: false, error: "请求格式错误" },
+      { status: 400 },
+    );
+  }
+  const phone = normalizePhone(
+    String((body as { phone?: unknown }).phone ?? ""),
+  );
   if (!phone) {
     return NextResponse.json(
       { ok: false, error: "手机号格式不正确" },

@@ -9,7 +9,7 @@ import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { OTP_MAX_ATTEMPTS } from "@/lib/constants";
 
 export async function POST(request: NextRequest) {
-  let body: { phone?: unknown; code?: unknown };
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
@@ -18,8 +18,18 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
-  const phone = normalizePhone(String(body.phone ?? ""));
-  const code = String(body.code ?? "");
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json(
+      { ok: false, error: "请求格式错误" },
+      { status: 400 },
+    );
+  }
+  const { phone: rawPhone, code: rawCode } = body as {
+    phone?: unknown;
+    code?: unknown;
+  };
+  const phone = normalizePhone(String(rawPhone ?? ""));
+  const code = String(rawCode ?? "");
   if (!phone || !/^\d{6}$/.test(code)) {
     return NextResponse.json(
       { ok: false, error: "验证码错误" },
@@ -65,7 +75,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await prisma.otpCode.delete({ where: { id: otp.id } });
+  const consumed = await prisma.otpCode.deleteMany({
+    where: { id: otp.id, attempts: { lt: OTP_MAX_ATTEMPTS } },
+  });
+  if (consumed.count === 0) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          otp.attempts >= OTP_MAX_ATTEMPTS - 1
+            ? "验证码错误次数过多"
+            : "验证码错误",
+      },
+      { status: 400 },
+    );
+  }
 
   const adminPhones = (process.env.ADMIN_PHONES || "")
     .split(",")
