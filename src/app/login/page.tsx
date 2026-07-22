@@ -6,6 +6,8 @@ type ApiResponse = {
   ok?: boolean;
   error?: string;
   needsOnboarding?: boolean;
+  dryRun?: boolean;
+  devCode?: string;
 };
 
 async function readResponse(response: Response): Promise<ApiResponse> {
@@ -21,11 +23,13 @@ export default function LoginPage() {
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [error, setError] = useState("");
+  const [hint, setHint] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   async function sendOtp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setHint("");
     setSubmitting(true);
 
     try {
@@ -38,6 +42,10 @@ export default function LoginPage() {
       if (!response.ok || !result.ok) {
         setError(result.error ?? "验证码发送失败，请稍后重试");
         return;
+      }
+      if (result.dryRun && result.devCode) {
+        setCode(result.devCode);
+        setHint(`开发模式（未发短信）：验证码 ${result.devCode}`);
       }
       setStep("code");
     } catch {
@@ -131,11 +139,17 @@ export default function LoginPage() {
                   setStep("phone");
                   setCode("");
                   setError("");
+                  setHint("");
                 }}
               >
                 更换手机号（{phone}）
               </button>
             </div>
+            {hint && (
+              <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {hint}
+              </p>
+            )}
             {error && (
               <p className="text-sm text-red-600" role="alert">
                 {error}

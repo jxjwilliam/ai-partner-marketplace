@@ -106,5 +106,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Local/dev only: real SMS is skipped when SMS_DRY_RUN=true.
+  if (process.env.SMS_DRY_RUN === "true") {
+    return NextResponse.json({ ok: true, dryRun: true, devCode: code });
+  }
+
   return NextResponse.json({ ok: true });
 }

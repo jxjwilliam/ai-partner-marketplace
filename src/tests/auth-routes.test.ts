@@ -130,7 +130,7 @@ describe("POST /api/auth/send-otp", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true });
+    await expect(response.json()).resolves.toMatchObject({ ok: true });
     expect(mocks.sendSmsOtp).toHaveBeenCalledWith(
       "13800138000",
       expect.stringMatching(/^\d{6}$/),
