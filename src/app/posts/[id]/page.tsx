@@ -78,6 +78,7 @@ export default async function PostDetailPage({
   const updated = await prisma.post.update({
     where: { id: post.id },
     data: { viewCount: { increment: 1 } },
+    select: { viewCount: true },
   });
   const viewCount = updated.viewCount;
 
