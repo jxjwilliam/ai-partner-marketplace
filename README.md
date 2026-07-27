@@ -105,3 +105,12 @@ Where the design spec conflicts with older PRDs in `docs/`, **the design spec wi
 ## License
 
 Private project (`package.json` `"private": true`).
+
+<!-- screenshots -->
+## Screenshots
+
+| 首页 |
+| --- |
+| ![首页](screenshots/home.png) |
+
+<!-- /screenshots -->

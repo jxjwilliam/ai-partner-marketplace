@@ -1,0 +1,19 @@
+{
+  "localhost": [
+    {
+      "name": "home",
+      "file": "screenshots/home.png",
+      "status": "ok"
+    },
+    {
+      "name": "home",
+      "file": "screenshots/home.png",
+      "status": "ok"
+    },
+    {
+      "name": "home",
+      "file": "screenshots/home.png",
+      "status": "ok"
+    }
+  ]
+}
