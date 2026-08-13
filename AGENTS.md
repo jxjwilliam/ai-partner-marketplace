@@ -30,7 +30,7 @@ That design **overrides** older drafts under `docs/` (Kimi PRD, Doubao/DeepSeek 
 | Auth | `src/lib/auth/` | OTP helpers, session cookie, SMS adapter |
 | Posts | `src/lib/posts/` | Zod `parsePostInput`, `buildPostWhere`（搜索/排序/分页）, visibility |
 | Unlock | `src/lib/unlock/` | `canCreateUnlockRequest`, `nextUnlockStatus` |
-| AI | `src/lib/ai/polish.ts` | Sanitize + OpenAI-compatible client |
+| AI | `src/lib/ai/` | `polish.ts` 润色；`match.ts` 推荐（规则评分 + LLM 理由 + 缓存，30 分钟 TTL） |
 | Data | `src/lib/data.ts` | 全部数据库访问集中于此（supabase-js + service_role，`sf_` 前缀表），路由不直接拼 REST |
 | Schema | `supabase/migrations/` | Supabase 托管 Postgres；表统一 `sf_` 前缀，迁移 SQL 由 CLI `db query --linked` 执行 |
 | Tests | `src/tests/` | Vitest; prefer unit + mocked `@/lib/data` route tests |

@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 const mocks = vi.hoisted(() => ({
   getSessionUser: vi.fn(),
   updateUserProfile: vi.fn(),
+  clearUserRecommendations: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({
@@ -12,6 +13,7 @@ vi.mock("@/lib/auth/session", () => ({
 
 vi.mock("@/lib/data", () => ({
   updateUserProfile: mocks.updateUserProfile,
+  clearUserRecommendations: mocks.clearUserRecommendations,
 }));
 
 import { GET, PATCH } from "@/app/api/me/route";
@@ -42,6 +44,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getSessionUser.mockResolvedValue(sessionUser);
   mocks.updateUserProfile.mockResolvedValue(sessionUser);
+  mocks.clearUserRecommendations.mockResolvedValue(undefined);
 });
 
 describe("GET /api/me", () => {

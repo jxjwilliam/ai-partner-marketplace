@@ -17,7 +17,7 @@ function isEntireContactValue(value: string): boolean {
   return false;
 }
 
-function scrubContactPatterns(value: string): string {
+export function scrubContactText(value: string): string {
   return value
     .replace(PHONE_PATTERN, REDACTED)
     .replace(EMAIL_PATTERN, REDACTED)
@@ -32,7 +32,7 @@ export function sanitizePolishFields(
     if (BLOCKED.test(key)) continue;
     if (isEntireContactValue(value)) continue;
 
-    const scrubbed = scrubContactPatterns(value);
+    const scrubbed = scrubContactText(value);
     if (scrubbed.trim()) safe[key] = scrubbed;
   }
   return safe;

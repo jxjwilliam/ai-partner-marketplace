@@ -1,9 +1,14 @@
 import Link from "next/link";
 import FilterBar from "@/components/FilterBar";
 import PostCard from "@/components/PostCard";
+import RecommendedPosts, {
+  type RecommendedItem,
+} from "@/components/RecommendedPosts";
 import SearchBox from "@/components/SearchBox";
 import SortSelect from "@/components/SortSelect";
-import { countPostsByType, listPosts } from "@/lib/data";
+import { getSessionUser } from "@/lib/auth/session";
+import { recommendForUser } from "@/lib/ai/match";
+import { countPostsByType, getPostsByIds, listPosts } from "@/lib/data";
 import { POST_TYPE_LABEL } from "@/lib/constants";
 import {
   buildPostWhere,
@@ -51,6 +56,23 @@ export default async function Home({ searchParams }: HomeProps) {
     countPostsByType(),
   ]);
   const { posts: visiblePosts, hasMore } = result;
+
+  const user = await getSessionUser();
+  let recommendations: RecommendedItem[] = [];
+  if (user) {
+    try {
+      const recs = await recommendForUser(user, 3);
+      const posts = await getPostsByIds(recs.map((item) => item.postId));
+      const byId = new Map(posts.map((post) => [post.id, post]));
+      recommendations = recs.map((item) => ({
+        post: byId.get(item.postId) ?? null,
+        score: item.score,
+        reason: item.reason,
+      }));
+    } catch {
+      recommendations = [];
+    }
+  }
 
   function listHref(next: {
     type?: string;
@@ -124,6 +146,8 @@ export default async function Home({ searchParams }: HomeProps) {
             );
           })}
         </section>
+
+        <RecommendedPosts items={recommendations} />
 
         <FilterBar city={city} type={type} tags={tags} search={search} sort={sort} page={page} />
 

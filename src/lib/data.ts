@@ -289,6 +289,39 @@ export type PostListItem = {
   } | null;
 };
 
+function postRowToListItem(
+  row: PostRow & {
+    sf_users: {
+      id: string;
+      nickname: string | null;
+      city: string | null;
+      role_tag: RoleTag | null;
+      is_verified: boolean;
+    } | null;
+  },
+): PostListItem {
+  return {
+    id: row.id,
+    type: row.type,
+    title: row.title,
+    city: row.city,
+    tags: row.tags ?? [],
+    bodyJson: row.body_json ?? {},
+    viewCount: row.view_count,
+    createdAt: new Date(row.created_at),
+    bumpedAt: new Date(row.bumped_at),
+    author: row.sf_users
+      ? {
+          id: row.sf_users.id,
+          nickname: row.sf_users.nickname,
+          city: row.sf_users.city,
+          roleTag: row.sf_users.role_tag,
+          isVerified: row.sf_users.is_verified,
+        }
+      : null,
+  };
+}
+
 export async function listPosts(input: {
   city?: string;
   type?: PostType;
@@ -300,7 +333,7 @@ export async function listPosts(input: {
   const pageSize = HOME_PAGE_SIZE;
   const base =
     "id,author_id,type,title,city,tags,body_json,view_count,status,created_at,bumped_at," +
-    "sf_users(id,nickname,city,role_tag,is_verified)";
+    "sf_users!sf_posts_author_id_fkey(id,nickname,city,role_tag,is_verified)";
 
   let query = supabase
     .from("sf_posts")
@@ -337,29 +370,128 @@ export async function listPosts(input: {
   >;
   const hasMore = rows.length > pageSize;
   const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
-  return {
-    posts: pageRows.map((row) => ({
-      id: row.id,
-      type: row.type,
-      title: row.title,
-      city: row.city,
-      tags: row.tags ?? [],
-      bodyJson: row.body_json ?? {},
-      viewCount: row.view_count,
-      createdAt: new Date(row.created_at),
-      bumpedAt: new Date(row.bumped_at),
-      author: row.sf_users
-        ? {
-            id: row.sf_users.id,
-            nickname: row.sf_users.nickname,
-            city: row.sf_users.city,
-            roleTag: row.sf_users.role_tag,
-            isVerified: row.sf_users.is_verified,
-          }
-        : null,
-    })),
-    hasMore,
-  };
+  return { posts: pageRows.map(postRowToListItem), hasMore };
+}
+
+export async function getPostsByIds(ids: string[]): Promise<PostListItem[]> {
+  if (ids.length === 0) return [];
+  const base =
+    "id,author_id,type,title,city,tags,body_json,view_count,status,created_at,bumped_at," +
+    "sf_users!sf_posts_author_id_fkey(id,nickname,city,role_tag,is_verified)";
+  const { data, error } = await supabase
+    .from("sf_posts")
+    .select(base)
+    .in("id", ids)
+    .eq("status", "active");
+  if (error) throw new Error("查询帖子失败");
+  return ((data ?? []) as unknown as Array<
+    PostRow & {
+      sf_users: {
+        id: string;
+        nickname: string | null;
+        city: string | null;
+        role_tag: RoleTag | null;
+        is_verified: boolean;
+      } | null;
+    }
+  >).map(postRowToListItem);
+}
+
+export async function listPostsForMatching(
+  userId: string,
+  limit = 100,
+): Promise<
+  Array<{
+    id: string;
+    authorId: string;
+    type: PostType;
+    title: string;
+    city: string;
+    tags: string[];
+    bodyJson: Record<string, unknown>;
+  }>
+> {
+  const { data } = await supabase
+    .from("sf_posts")
+    .select("id,author_id,type,title,city,tags,body_json")
+    .eq("status", "active")
+    .neq("author_id", userId)
+    .order("bumped_at", { ascending: false })
+    .limit(limit);
+  return ((data ?? []) as unknown as Array<{
+    id: string;
+    author_id: string;
+    type: PostType;
+    title: string;
+    city: string;
+    tags: string[] | null;
+    body_json: Record<string, unknown>;
+  }>).map((row) => ({
+    id: row.id,
+    authorId: row.author_id,
+    type: row.type,
+    title: row.title,
+    city: row.city,
+    tags: row.tags ?? [],
+    bodyJson: row.body_json ?? {},
+  }));
+}
+
+/* ── AI 匹配推荐缓存 ── */
+
+export type CachedRecommendation = {
+  postId: string;
+  score: number;
+  reason: string;
+};
+
+export async function getCachedRecommendations(
+  userId: string,
+  since: Date,
+): Promise<CachedRecommendation[]> {
+  const { data } = await supabase
+    .from("sf_recommendations")
+    .select("post_id,score,reason")
+    .eq("user_id", userId)
+    .gte("created_at", since.toISOString())
+    .order("score", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(6);
+  return ((data ?? []) as unknown as Array<{
+    post_id: string;
+    score: number;
+    reason: string;
+  }>).map((row) => ({
+    postId: row.post_id,
+    score: Number(row.score) || 0,
+    reason: row.reason ?? "",
+  }));
+}
+
+export async function upsertRecommendations(
+  userId: string,
+  rows: Array<{ postId: string; score: number; reason: string }>,
+): Promise<void> {
+  if (rows.length === 0) return;
+  const { error } = await supabase
+    .from("sf_recommendations")
+    .upsert(
+      rows.map((row) => ({
+        user_id: userId,
+        post_id: row.postId,
+        score: row.score,
+        reason: row.reason,
+      })),
+      { onConflict: "user_id,post_id" },
+    );
+  if (error) throw new Error("保存推荐失败");
+}
+
+export async function clearUserRecommendations(userId: string): Promise<void> {
+  await supabase
+    .from("sf_recommendations")
+    .delete()
+    .eq("user_id", userId);
 }
 
 export async function countPostsByType(): Promise<Record<PostType, number>> {
@@ -382,7 +514,7 @@ export async function getPostById(
 ): Promise<(Post & { author: User | null }) | null> {
   const { data } = await supabase
     .from("sf_posts")
-    .select("*,sf_users(*)")
+    .select("*,sf_users!sf_posts_author_id_fkey(*)")
     .eq("id", id)
     .maybeSingle();
   if (!data) return null;
@@ -557,7 +689,7 @@ export async function getUnlockRequest(requestId: string): Promise<{
 } | null> {
   const { data } = await supabase
     .from("sf_contact_requests")
-    .select("id,status,sf_posts(author_id)")
+    .select("id,status,sf_posts!sf_contact_requests_post_id_fkey(author_id)")
     .eq("id", requestId)
     .maybeSingle();
   if (!data) return null;
@@ -597,7 +729,9 @@ export async function listIncomingUnlocks(userId: string): Promise<
 > {
   const { data } = await supabase
     .from("sf_contact_requests")
-    .select("id,message,created_at,sf_users(nickname),sf_posts(title)")
+    .select(
+      "id,message,created_at,sf_users!sf_contact_requests_requester_id_fkey(nickname),sf_posts!sf_contact_requests_post_id_fkey(title)",
+    )
     .eq("status", "pending")
     .eq("sf_posts.author_id", userId)
     .order("created_at", { ascending: false });
@@ -634,7 +768,7 @@ export async function listOutgoingUnlocks(userId: string): Promise<
   const { data } = await supabase
     .from("sf_contact_requests")
     .select(
-      "id,status,created_at,sf_posts(id,title,author_id,contact_private,sf_users(nickname))",
+      "id,status,created_at,sf_posts!sf_contact_requests_post_id_fkey(id,title,author_id,contact_private,sf_users!sf_posts_author_id_fkey(nickname))",
     )
     .eq("requester_id", userId)
     .order("created_at", { ascending: false });

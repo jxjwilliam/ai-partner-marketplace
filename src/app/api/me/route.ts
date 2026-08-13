@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
-import { updateUserProfile } from "@/lib/data";
+import { clearUserRecommendations, updateUserProfile } from "@/lib/data";
 import { FILTER_CITIES } from "@/lib/constants";
 import type { RoleTag, User } from "@/lib/types";
 
@@ -99,6 +99,7 @@ export async function PATCH(req: NextRequest) {
           ? null
           : undefined,
   });
+  await clearUserRecommendations(user.id).catch(() => undefined);
 
   return NextResponse.json({ ok: true, user: safeUser(updated) });
 }
