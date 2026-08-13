@@ -7,3 +7,6 @@ tsconfig.tsbuildinfo
 .codegraph/
 supabase/.temp/
 .DS_Store
+.agents/
+.claude/
+skills-lock.json
