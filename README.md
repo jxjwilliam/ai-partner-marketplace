@@ -141,8 +141,12 @@ Private project (`package.json` `"private": true`).
 <!-- screenshots -->
 ## Screenshots
 
-| 首页 |
-| --- |
-| ![首页](screenshots/home.png) |
+| Home | Post Detail | Publish |
+| --- | --- | --- |
+| ![Home](screenshots/home.png) | ![Post Detail](screenshots/post-detail.png) | ![Publish](screenshots/publish.png) |
+
+| Search | Login | Me |
+| --- | --- | --- |
+| ![Search](screenshots/home-search.png) | ![Login](screenshots/login.png) | ![Me](screenshots/me.png) |
 
 <!-- /screenshots -->

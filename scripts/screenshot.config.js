@@ -7,7 +7,7 @@ export default {
   // ── Targets ──────────────────────────────────────────────────────────────
   // Define one or more base URLs to screenshot.
   targets: {
-    localhost: "http://localhost:3001",       // Next.js default
+    localhost: "http://localhost:3100",       // Next.js production server
     // localhost: "http://localhost:5173",    // Vite/React default
     // localhost: "http://localhost:8000",    // FastAPI SPA default
     // vercel: "https://your-app.vercel.app", // deployed version
@@ -69,5 +69,10 @@ export default {
   //     { path: "/", name: "Home" },
   //   ],
   // },
-  manualRoutes: [],
+  manualRoutes: [
+    { path: "/", name: "Home" },
+    { path: "/posts/seed-post-01", name: "Post Detail" },
+    { path: "/posts/new", name: "Publish" },
+    { path: "/login", name: "Login" },
+  ],
 };
