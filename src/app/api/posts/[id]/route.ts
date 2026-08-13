@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
-import { prisma } from "@/lib/db";
+import {
+  getPostAuthor,
+  getPostById,
+  getUnlockStatus,
+  incrementPostViews,
+  updatePostStatusOrBump,
+} from "@/lib/data";
 import { shouldRevealContact } from "@/lib/posts/visibility";
 
 type RouteContext = {
@@ -17,14 +23,7 @@ function notFound() {
 export async function GET(_req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   const viewer = await getSessionUser();
-  const post = await prisma.post.findUnique({
-    where: { id },
-    include: {
-      author: {
-        select: { id: true, nickname: true, city: true, roleTag: true },
-      },
-    },
-  });
+  const post = await getPostById(id);
 
   if (
     !post ||
@@ -37,16 +36,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 
   let unlockStatus: "pending" | "approved" | "rejected" | null = null;
   if (viewer && viewer.id !== post.authorId) {
-    const unlock = await prisma.contactRequest.findUnique({
-      where: {
-        postId_requesterId: {
-          postId: post.id,
-          requesterId: viewer.id,
-        },
-      },
-      select: { status: true },
-    });
-    unlockStatus = unlock?.status ?? null;
+    unlockStatus = await getUnlockStatus(post.id, viewer.id);
   }
 
   const reveal = shouldRevealContact({
@@ -55,12 +45,8 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     unlockStatus,
   });
 
-  const updated = await prisma.post.update({
-    where: { id: post.id },
-    data: { viewCount: { increment: 1 } },
-  });
-
-  const incrementedPost = { ...post, viewCount: updated.viewCount };
+  const viewCount = await incrementPostViews(post.id);
+  const incrementedPost = { ...post, viewCount };
   if (reveal) {
     return NextResponse.json({ ok: true, post: incrementedPost });
   }
@@ -80,10 +66,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const post = await prisma.post.findUnique({
-    where: { id },
-    select: { authorId: true },
-  });
+  const post = await getPostAuthor(id);
   if (!post) return notFound();
 
   let raw: unknown;
@@ -127,13 +110,6 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     );
   }
 
-  await prisma.post.update({
-    where: { id },
-    data: {
-      ...(hide ? { status: "hidden" as const } : {}),
-      ...(bump ? { bumpedAt: new Date() } : {}),
-    },
-  });
-
+  await updatePostStatusOrBump(id, { hide, bump });
   return NextResponse.json({ ok: true });
 }

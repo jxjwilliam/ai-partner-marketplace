@@ -1,6 +1,4 @@
-import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import {
   assertCanSendOtp,
   generateOtpCode,
@@ -8,6 +6,12 @@ import {
   normalizePhone,
 } from "@/lib/auth/otp";
 import { sendSmsOtp } from "@/lib/auth/sms";
+import {
+  countOtpCreatedSince,
+  createOtpRow,
+  deleteOtpRow,
+  findLatestOtp,
+} from "@/lib/data";
 import { OTP_TTL_MS } from "@/lib/constants";
 
 export async function POST(request: NextRequest) {
@@ -43,73 +47,51 @@ export async function POST(request: NextRequest) {
 
   const code = generateOtpCode();
   const codeHash = await hashOtp(code);
-  let reservation:
-    | { ok: true; otpId: string }
-    | { ok: false; error: string };
-  try {
-    reservation = await prisma.$transaction(
-      async (tx) => {
-        const [last, sendsPhoneToday, sendsIpToday] = await Promise.all([
-          tx.otpCode.findFirst({
-            where: { phone },
-            orderBy: { createdAt: "desc" },
-          }),
-          tx.otpCode.count({
-            where: { phone, createdAt: { gte: dayStart } },
-          }),
-          tx.otpCode.count({
-            where: { ip, createdAt: { gte: dayStart } },
-          }),
-        ]);
-        const gate = assertCanSendOtp({
-          lastSentAt: last?.createdAt ?? null,
-          sendsPhoneToday,
-          sendsIpToday,
-        });
-        if (!gate.ok) return gate;
 
-        const otp = await tx.otpCode.create({
-          data: {
-            phone,
-            codeHash,
-            expiresAt: new Date(Date.now() + OTP_TTL_MS),
-            ip,
-          },
-        });
-        return { ok: true as const, otpId: otp.id };
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+  try {
+    const [last, sendsPhoneToday, sendsIpToday] = await Promise.all([
+      findLatestOtp(phone),
+      countOtpCreatedSince("phone", phone, dayStart),
+      countOtpCreatedSince("ip", ip, dayStart),
+    ]);
+    const gate = assertCanSendOtp({
+      lastSentAt: last?.createdAt ?? null,
+      sendsPhoneToday,
+      sendsIpToday,
+    });
+    if (!gate.ok) {
+      return NextResponse.json(
+        { ok: false, error: gate.error },
+        { status: 429 },
+      );
+    }
+
+    const otp = await createOtpRow({
+      phone,
+      codeHash,
+      expiresAt: new Date(Date.now() + OTP_TTL_MS),
+      ip,
+    });
+
+    try {
+      await sendSmsOtp(phone, code);
+    } catch {
+      await deleteOtpRow(otp.id).catch(() => undefined);
+      return NextResponse.json(
+        { ok: false, error: "服务暂不可用" },
+        { status: 503 },
+      );
+    }
+
+    // Local/dev only: real SMS is skipped when SMS_DRY_RUN=true.
+    if (process.env.SMS_DRY_RUN === "true") {
+      return NextResponse.json({ ok: true, dryRun: true, devCode: code });
+    }
+    return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(
       { ok: false, error: "服务暂不可用" },
       { status: 503 },
     );
   }
-
-  if (!reservation.ok) {
-    return NextResponse.json(
-      { ok: false, error: reservation.error },
-      { status: 429 },
-    );
-  }
-
-  try {
-    await sendSmsOtp(phone, code);
-  } catch {
-    await prisma.otpCode
-      .delete({ where: { id: reservation.otpId } })
-      .catch(() => undefined);
-    return NextResponse.json(
-      { ok: false, error: "服务暂不可用" },
-      { status: 503 },
-    );
-  }
-
-  // Local/dev only: real SMS is skipped when SMS_DRY_RUN=true.
-  if (process.env.SMS_DRY_RUN === "true") {
-    return NextResponse.json({ ok: true, dryRun: true, devCode: code });
-  }
-
-  return NextResponse.json({ ok: true });
 }

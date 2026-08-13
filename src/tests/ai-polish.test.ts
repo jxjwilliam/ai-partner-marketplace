@@ -80,8 +80,8 @@ describe("sanitizePolishFields", () => {
 
 describe("polishFields", () => {
   it("never includes contact fields in the LLM request", async () => {
-    vi.stubEnv("LLM_API_KEY", "test-key");
-    vi.stubEnv("LLM_BASE_URL", "https://llm.example.com");
+    vi.stubEnv("OPENAI_COMPATIBLE_API_KEY", "test-key");
+    vi.stubEnv("OPENAI_COMPATIBLE_BASE_URL", "https://llm.example.com");
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({

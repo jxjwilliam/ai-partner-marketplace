@@ -3,33 +3,27 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getSessionUser: vi.fn(),
-  postFindUnique: vi.fn(),
-  requestCount: vi.fn(),
-  requestFindUnique: vi.fn(),
-  requestCreate: vi.fn(),
-  requestUpdate: vi.fn(),
-  requestUpdateMany: vi.fn(),
-  requestUpsert: vi.fn(),
-  transaction: vi.fn(),
+  getPostAuthor: vi.fn(),
+  countPendingUnlocksToday: vi.fn(),
+  getUnlockStatus: vi.fn(),
+  createUnlockRequest: vi.fn(),
+  reopenUnlockRequest: vi.fn(),
+  getUnlockRequest: vi.fn(),
+  decideUnlockRequest: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({
   getSessionUser: mocks.getSessionUser,
 }));
 
-vi.mock("@/lib/db", () => ({
-  prisma: {
-    post: { findUnique: mocks.postFindUnique },
-    contactRequest: {
-      count: mocks.requestCount,
-      findUnique: mocks.requestFindUnique,
-      create: mocks.requestCreate,
-      update: mocks.requestUpdate,
-      updateMany: mocks.requestUpdateMany,
-      upsert: mocks.requestUpsert,
-    },
-    $transaction: mocks.transaction,
-  },
+vi.mock("@/lib/data", () => ({
+  getPostAuthor: mocks.getPostAuthor,
+  countPendingUnlocksToday: mocks.countPendingUnlocksToday,
+  getUnlockStatus: mocks.getUnlockStatus,
+  createUnlockRequest: mocks.createUnlockRequest,
+  reopenUnlockRequest: mocks.reopenUnlockRequest,
+  getUnlockRequest: mocks.getUnlockRequest,
+  decideUnlockRequest: mocks.decideUnlockRequest,
 }));
 
 import { POST as createUnlock } from "@/app/api/posts/[id]/unlock/route";
@@ -42,6 +36,9 @@ const viewer = {
   city: "北京",
   roleTag: "talent",
   bio: null,
+  skills: [],
+  yearsExperience: null,
+  isVerified: false,
   isAdmin: false,
   createdAt: new Date("2026-01-01"),
 };
@@ -57,36 +54,33 @@ function request(url: string, body: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getSessionUser.mockResolvedValue(viewer);
-  mocks.postFindUnique.mockResolvedValue({
-    id: "post-1",
-    authorId: "author-1",
-    status: "active",
+  mocks.getPostAuthor.mockResolvedValue({ authorId: "author-1", status: "active" });
+  mocks.countPendingUnlocksToday.mockResolvedValue(0);
+  mocks.getUnlockStatus.mockResolvedValue(null);
+  mocks.createUnlockRequest.mockResolvedValue({
+    id: "request-1",
+    postId: "post-1",
+    requesterId: "viewer-1",
+    message: "我有相关经验",
+    status: "pending",
+    createdAt: new Date(),
+    decidedAt: null,
   });
-  mocks.requestCount.mockResolvedValue(0);
-  mocks.requestFindUnique.mockResolvedValue(null);
-  mocks.requestCreate.mockResolvedValue({ id: "request-1", status: "pending" });
-  mocks.requestUpdateMany.mockResolvedValue({ count: 1 });
-  mocks.requestUpsert.mockResolvedValue({ id: "request-1", status: "pending" });
-  mocks.transaction.mockImplementation(
-    async (
-      callback: (tx: {
-        contactRequest: {
-          count: typeof mocks.requestCount;
-          findUnique: typeof mocks.requestFindUnique;
-          create: typeof mocks.requestCreate;
-          upsert: typeof mocks.requestUpsert;
-        };
-      }) => unknown,
-    ) =>
-      callback({
-        contactRequest: {
-          count: mocks.requestCount,
-          findUnique: mocks.requestFindUnique,
-          create: mocks.requestCreate,
-          upsert: mocks.requestUpsert,
-        },
-      }),
-  );
+  mocks.reopenUnlockRequest.mockResolvedValue({
+    id: "request-1",
+    postId: "post-1",
+    requesterId: "viewer-1",
+    message: "重新提交",
+    status: "pending",
+    createdAt: new Date(),
+    decidedAt: null,
+  });
+  mocks.getUnlockRequest.mockResolvedValue({
+    id: "request-1",
+    status: "pending",
+    post: { authorId: "author-1" },
+  });
+  mocks.decideUnlockRequest.mockResolvedValue(true);
 });
 
 describe("POST /api/posts/[id]/unlock", () => {
@@ -101,7 +95,7 @@ describe("POST /api/posts/[id]/unlock", () => {
     );
 
     expect(response.status).toBe(401);
-    expect(mocks.postFindUnique).not.toHaveBeenCalled();
+    expect(mocks.getPostAuthor).not.toHaveBeenCalled();
   });
 
   it("creates a pending request after checking today's pending count", async () => {
@@ -113,36 +107,23 @@ describe("POST /api/posts/[id]/unlock", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.transaction).toHaveBeenCalledWith(
-      expect.any(Function),
-      { isolationLevel: "Serializable" },
+    expect(mocks.countPendingUnlocksToday).toHaveBeenCalledWith(
+      "viewer-1",
+      expect.any(Date),
     );
-    expect(mocks.requestCount).toHaveBeenCalledWith({
-      where: {
-        requesterId: "viewer-1",
-        status: "pending",
-        createdAt: { gte: expect.any(Date) },
-      },
-    });
-    expect(mocks.requestCreate).toHaveBeenCalledWith({
-      data: {
-        postId: "post-1",
-        requesterId: "viewer-1",
-        message: "我有相关全栈经验，希望进一步沟通",
-      },
-      select: { id: true, status: true },
-    });
+    expect(mocks.createUnlockRequest).toHaveBeenCalledWith(
+      "post-1",
+      "viewer-1",
+      "我有相关全栈经验，希望进一步沟通",
+    );
     await expect(response.json()).resolves.toEqual({
       ok: true,
       request: { id: "request-1", status: "pending" },
     });
   });
 
-  it("reopens a rejected unique request with a new message", async () => {
-    mocks.requestFindUnique.mockResolvedValue({
-      id: "request-1",
-      status: "rejected",
-    });
+  it("reopens a rejected request with a new message", async () => {
+    mocks.getUnlockStatus.mockResolvedValue("rejected");
 
     const response = await createUnlock(
       request("http://localhost/api/posts/post-1/unlock", {
@@ -152,38 +133,33 @@ describe("POST /api/posts/[id]/unlock", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.requestUpsert).toHaveBeenCalledWith({
-      where: {
-        postId_requesterId: {
-          postId: "post-1",
-          requesterId: "viewer-1",
-        },
-      },
-      create: {
-        postId: "post-1",
-        requesterId: "viewer-1",
-        message: "补充介绍：我做过类似产品，可以投入开发",
-      },
-      update: {
-        message: "补充介绍：我做过类似产品，可以投入开发",
-        status: "pending",
-        decidedAt: null,
-        createdAt: expect.any(Date),
-      },
-      select: { id: true, status: true },
+    expect(mocks.reopenUnlockRequest).toHaveBeenCalledWith(
+      "post-1",
+      "viewer-1",
+      "补充介绍：我做过类似产品，可以投入开发",
+    );
+    expect(mocks.createUnlockRequest).not.toHaveBeenCalled();
+  });
+
+  it("rejects a duplicate pending request", async () => {
+    mocks.getUnlockStatus.mockResolvedValue("pending");
+
+    const response = await createUnlock(
+      request("http://localhost/api/posts/post-1/unlock", {
+        message: "我有相关全栈经验，希望进一步沟通",
+      }),
+      { params: Promise.resolve({ id: "post-1" }) },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "已有待处理申请",
     });
   });
 });
 
 describe("POST /api/unlock/[requestId]", () => {
-  beforeEach(() => {
-    mocks.requestFindUnique.mockResolvedValue({
-      id: "request-1",
-      status: "pending",
-      post: { authorId: "author-1" },
-    });
-  });
-
   it("allows only the post author to decide", async () => {
     const response = await decideUnlock(
       request("http://localhost/api/unlock/request-1", { action: "approve" }),
@@ -191,10 +167,10 @@ describe("POST /api/unlock/[requestId]", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(mocks.requestUpdate).not.toHaveBeenCalled();
+    expect(mocks.decideUnlockRequest).not.toHaveBeenCalled();
   });
 
-  it("approves a pending request and records the decision time", async () => {
+  it("approves a pending request and records the decision", async () => {
     mocks.getSessionUser.mockResolvedValue({ ...viewer, id: "author-1" });
     const response = await decideUnlock(
       request("http://localhost/api/unlock/request-1", { action: "approve" }),
@@ -202,10 +178,7 @@ describe("POST /api/unlock/[requestId]", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.requestUpdateMany).toHaveBeenCalledWith({
-      where: { id: "request-1", status: "pending" },
-      data: { status: "approved", decidedAt: expect.any(Date) },
-    });
+    expect(mocks.decideUnlockRequest).toHaveBeenCalledWith("request-1", "approved");
     await expect(response.json()).resolves.toEqual({
       ok: true,
       request: { id: "request-1", status: "approved" },
@@ -214,7 +187,7 @@ describe("POST /api/unlock/[requestId]", () => {
 
   it("returns a conflict when another decision wins the pending update race", async () => {
     mocks.getSessionUser.mockResolvedValue({ ...viewer, id: "author-1" });
-    mocks.requestUpdateMany.mockResolvedValue({ count: 0 });
+    mocks.decideUnlockRequest.mockResolvedValue(false);
 
     const response = await decideUnlock(
       request("http://localhost/api/unlock/request-1", { action: "reject" }),
@@ -230,7 +203,7 @@ describe("POST /api/unlock/[requestId]", () => {
 
   it("rejects attempts to decide an already decided request", async () => {
     mocks.getSessionUser.mockResolvedValue({ ...viewer, id: "author-1" });
-    mocks.requestFindUnique.mockResolvedValue({
+    mocks.getUnlockRequest.mockResolvedValue({
       id: "request-1",
       status: "approved",
       post: { authorId: "author-1" },
@@ -242,6 +215,6 @@ describe("POST /api/unlock/[requestId]", () => {
     );
 
     expect(response.status).toBe(409);
-    expect(mocks.requestUpdate).not.toHaveBeenCalled();
+    expect(mocks.decideUnlockRequest).not.toHaveBeenCalled();
   });
 });

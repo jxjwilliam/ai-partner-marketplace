@@ -46,6 +46,8 @@ export default function MeDashboard({
     city: string | null;
     role: string;
     bio: string | null;
+    skills: string[];
+    yearsExperience: number | null;
   };
   posts: PostItem[];
   incoming: IncomingItem[];
@@ -80,13 +82,30 @@ export default function MeDashboard({
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
       <section className="border border-slate-200 bg-white p-5 sm:p-7">
-        <p className="text-sm font-medium text-indigo-600">个人中心</p>
-        <h1 className="mt-2 text-2xl font-bold text-slate-950">
+        <p className="text-sm font-medium text-cyan-600">个人中心</p>
+        <h1 className="mt-2 text-2xl font-bold text-[#1F3A5F]">
           {profile.nickname ?? "集市用户"}
         </h1>
         <p className="mt-2 text-sm text-slate-500">
           {[profile.role, profile.city, profile.phone].filter(Boolean).join(" · ")}
         </p>
+        {profile.yearsExperience != null && (
+          <p className="mt-1 text-sm text-slate-500">
+            {profile.yearsExperience} 年以上经验
+          </p>
+        )}
+        {profile.skills.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {profile.skills.map((skill) => (
+              <span
+                className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
+                key={skill}
+              >
+                {skill}
+              </span>
+            ))}
+          </div>
+        )}
         {profile.bio && (
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-700">
             {profile.bio}
@@ -102,7 +121,7 @@ export default function MeDashboard({
           <button
             className={`border-b-2 px-5 py-3 text-sm font-semibold ${
               tab === value
-                ? "border-indigo-600 text-indigo-700"
+                ? "border-cyan-600 text-cyan-700"
                 : "border-transparent text-slate-500"
             }`}
             key={value}
@@ -134,7 +153,7 @@ export default function MeDashboard({
             >
               <div className="min-w-0 flex-1">
                 <Link
-                  className="font-semibold text-slate-900 hover:text-indigo-600"
+                  className="font-semibold text-slate-900 hover:text-cyan-600"
                   href={`/posts/${post.id}`}
                 >
                   {post.title}
@@ -196,7 +215,7 @@ export default function MeDashboard({
                       <button
                         className={
                           action === "approve"
-                            ? "bg-indigo-600 px-3 py-2 text-xs font-semibold text-white"
+                            ? "bg-cyan-600 px-3 py-2 text-xs font-semibold text-white"
                             : "border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
                         }
                         disabled={Boolean(busy)}
@@ -230,7 +249,7 @@ export default function MeDashboard({
               {outgoing.map((item) => (
                 <article className="border border-slate-200 bg-white p-4" key={item.id}>
                   <Link
-                    className="text-sm font-semibold text-slate-900 hover:text-indigo-600"
+                    className="text-sm font-semibold text-slate-900 hover:text-cyan-600"
                     href={`/posts/${item.postId}`}
                   >
                     {item.postTitle}

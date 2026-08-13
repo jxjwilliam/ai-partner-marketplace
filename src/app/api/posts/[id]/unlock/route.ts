@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
-import { prisma } from "@/lib/db";
+import {
+  countPendingUnlocksToday,
+  createUnlockRequest,
+  getPostAuthor,
+  getUnlockStatus,
+  reopenUnlockRequest,
+} from "@/lib/data";
 import { canCreateUnlockRequest } from "@/lib/unlock/state";
 
 type RouteContext = {
@@ -16,10 +22,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
   if (!user) return error("请先登录", 401);
 
   const { id: postId } = await context.params;
-  const post = await prisma.post.findUnique({
-    where: { id: postId },
-    select: { id: true, authorId: true, status: true },
-  });
+  const post = await getPostAuthor(postId);
   if (!post) return error("信息不存在", 404);
 
   let message: string;
@@ -35,63 +38,28 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
-  const result = await prisma.$transaction(
-    async (tx) => {
-      const [pendingToday, existing] = await Promise.all([
-        tx.contactRequest.count({
-          where: {
-            requesterId: user.id,
-            status: "pending",
-            createdAt: { gte: startOfToday },
-          },
-        }),
-        tx.contactRequest.findUnique({
-          where: {
-            postId_requesterId: { postId, requesterId: user.id },
-          },
-          select: { id: true, status: true },
-        }),
-      ]);
+  const [pendingToday, existingStatus] = await Promise.all([
+    countPendingUnlocksToday(user.id, startOfToday),
+    getUnlockStatus(postId, user.id),
+  ]);
 
-      const allowed = canCreateUnlockRequest({
-        authorId: post.authorId,
-        requesterId: user.id,
-        message,
-        pendingToday,
-        existingStatus: existing?.status ?? null,
-        postStatus: post.status,
-      });
-      if (!allowed.ok) return allowed;
+  const allowed = canCreateUnlockRequest({
+    authorId: post.authorId,
+    requesterId: user.id,
+    message,
+    pendingToday,
+    existingStatus,
+    postStatus: post.status,
+  });
+  if (!allowed.ok) return error(allowed.error, 400);
 
-      const select = { id: true, status: true } as const;
-      const unlock =
-        existing?.status === "rejected"
-          ? await tx.contactRequest.upsert({
-              where: {
-                postId_requesterId: { postId, requesterId: user.id },
-              },
-              create: { postId, requesterId: user.id, message },
-              // The unique row is intentionally reopened so a rejected requester
-              // can submit a revised introduction without creating duplicates.
-              update: {
-                message,
-                status: "pending",
-                decidedAt: null,
-                createdAt: new Date(),
-              },
-              select,
-            })
-          : await tx.contactRequest.create({
-              data: { postId, requesterId: user.id, message },
-              select,
-            });
+  const request =
+    existingStatus === "rejected"
+      ? await reopenUnlockRequest(postId, user.id, message)
+      : await createUnlockRequest(postId, user.id, message);
 
-      return { ok: true as const, unlock };
-    },
-    { isolationLevel: "Serializable" },
-  );
-
-  if (!result.ok) return error(result.error, 400);
-
-  return NextResponse.json({ ok: true, request: result.unlock });
+  return NextResponse.json({
+    ok: true,
+    request: { id: request.id, status: request.status },
+  });
 }

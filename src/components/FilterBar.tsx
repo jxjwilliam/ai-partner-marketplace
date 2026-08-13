@@ -6,9 +6,19 @@ type FilterBarProps = {
   city?: string;
   type?: string;
   tags: string[];
+  search?: string;
+  sort?: string;
+  page?: number;
 };
 
-export default function FilterBar({ city, type = "all", tags }: FilterBarProps) {
+export default function FilterBar({
+  city,
+  type = "all",
+  tags,
+  search,
+  sort,
+  page,
+}: FilterBarProps) {
   function hrefFor(changes: {
     city?: string;
     type?: string;
@@ -22,6 +32,9 @@ export default function FilterBar({ city, type = "all", tags }: FilterBarProps) 
     if (nextCity && nextCity !== "全部") params.set("city", nextCity);
     if (nextType && nextType !== "all") params.set("type", nextType);
     if (nextTags.length) params.set("tags", nextTags.join(","));
+    if (search?.trim()) params.set("q", search.trim());
+    if (sort && sort !== "latest") params.set("sort", sort);
+    if (page && page > 1) params.set("page", String(page));
 
     const query = params.toString();
     return query ? `/?${query}` : "/";
@@ -30,9 +43,9 @@ export default function FilterBar({ city, type = "all", tags }: FilterBarProps) 
   return (
     <section
       aria-label="筛选帖子"
-      className="border border-slate-200 bg-white text-sm"
+      className="rounded-2xl border border-slate-200 bg-white text-sm shadow-sm"
     >
-      <div className="flex border-b border-slate-100">
+      <div className="flex overflow-hidden rounded-t-2xl border-b border-slate-100">
         <span className="w-16 shrink-0 bg-slate-50 px-3 py-3 font-medium text-slate-500">
           城市
         </span>
@@ -44,7 +57,7 @@ export default function FilterBar({ city, type = "all", tags }: FilterBarProps) 
                 aria-current={selected ? "page" : undefined}
                 className={`rounded px-2 py-1 ${
                   selected
-                    ? "bg-slate-900 font-medium text-white"
+                    ? "bg-[#1F3A5F] font-medium text-white"
                     : "text-slate-600 hover:bg-slate-100"
                 }`}
                 href={hrefFor({ city: item })}
@@ -69,7 +82,7 @@ export default function FilterBar({ city, type = "all", tags }: FilterBarProps) 
                 aria-current={selected ? "page" : undefined}
                 className={`rounded px-2 py-1 ${
                   selected
-                    ? "bg-indigo-600 font-medium text-white"
+                    ? "bg-cyan-600 font-medium text-white"
                     : "text-slate-600 hover:bg-slate-100"
                 }`}
                 href={hrefFor({ type: item })}
@@ -97,7 +110,7 @@ export default function FilterBar({ city, type = "all", tags }: FilterBarProps) 
                 aria-pressed={selected}
                 className={`rounded px-2 py-1 ${
                   selected
-                    ? "bg-emerald-100 font-medium text-emerald-800"
+                    ? "bg-cyan-50 font-medium text-cyan-800"
                     : "text-slate-600 hover:bg-slate-100"
                 }`}
                 href={hrefFor({ tags: nextTags })}

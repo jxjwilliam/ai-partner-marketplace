@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import ContactUnlockPanel from "@/components/ContactUnlockPanel";
 import { getSessionUser } from "@/lib/auth/session";
 import { POST_TYPE_LABEL } from "@/lib/constants";
-import { prisma } from "@/lib/db";
+import {
+  getPostById,
+  getUnlockStatus,
+  incrementPostViews,
+} from "@/lib/data";
 import { shouldRevealContact } from "@/lib/posts/visibility";
 
 const BODY_LABELS: Record<string, string> = {
@@ -50,24 +54,7 @@ export default async function PostDetailPage({
 }) {
   const { id } = await params;
   const viewer = await getSessionUser();
-  const post = await prisma.post.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      authorId: true,
-      type: true,
-      title: true,
-      city: true,
-      tags: true,
-      bodyJson: true,
-      contactPrivate: true,
-      status: true,
-      createdAt: true,
-      author: {
-        select: { nickname: true, city: true, roleTag: true, createdAt: true },
-      },
-    },
-  });
+  const post = await getPostById(id);
 
   if (
     !post ||
@@ -78,24 +65,10 @@ export default async function PostDetailPage({
     notFound();
   }
 
-  const updated = await prisma.post.update({
-    where: { id: post.id },
-    data: { viewCount: { increment: 1 } },
-    select: { viewCount: true },
-  });
-  const viewCount = updated.viewCount;
+  const viewCount = await incrementPostViews(post.id);
   let unlockStatus: "pending" | "approved" | "rejected" | null = null;
   if (viewer && viewer.id !== post.authorId) {
-    const unlock = await prisma.contactRequest.findUnique({
-      where: {
-        postId_requesterId: {
-          postId: post.id,
-          requesterId: viewer.id,
-        },
-      },
-      select: { status: true },
-    });
-    unlockStatus = unlock?.status ?? null;
+    unlockStatus = await getUnlockStatus(post.id, viewer.id);
   }
   const revealContact = shouldRevealContact({
     viewerId: viewer?.id ?? null,
@@ -115,7 +88,7 @@ export default async function PostDetailPage({
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
-      <Link className="text-sm text-slate-500 hover:text-indigo-600" href="/">
+      <Link className="text-sm text-slate-500 hover:text-cyan-600" href="/">
         ← 返回集市
       </Link>
 
@@ -123,7 +96,7 @@ export default async function PostDetailPage({
         <article className="border border-slate-200 bg-white">
           <header className="border-b border-slate-200 px-5 py-5 sm:px-7">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="rounded bg-indigo-50 px-2 py-1 font-semibold text-indigo-700">
+              <span className="rounded bg-cyan-50 px-2 py-1 font-semibold text-cyan-700">
                 {POST_TYPE_LABEL[post.type]}
               </span>
               <span className="text-slate-500">{post.city}</span>
@@ -164,15 +137,15 @@ export default async function PostDetailPage({
           <section className="border border-slate-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-slate-950">发布者</h2>
             <p className="mt-3 font-medium text-slate-800">
-              {post.author.nickname ?? "集市用户"}
+              {post.author?.nickname ?? "集市用户"}
             </p>
             <p className="mt-1 text-sm text-slate-500">
-              {[post.author.roleTag && ROLE_LABELS[post.author.roleTag], post.author.city]
+              {[post.author?.roleTag && ROLE_LABELS[post.author.roleTag], post.author?.city]
                 .filter(Boolean)
                 .join(" · ") || "资料待完善"}
             </p>
             <p className="mt-3 text-xs text-slate-400">
-              {post.author.createdAt.toLocaleDateString("zh-CN")} 加入
+              {post.author?.createdAt.toLocaleDateString("zh-CN")} 加入
             </p>
           </section>
 

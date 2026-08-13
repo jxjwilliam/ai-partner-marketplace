@@ -3,19 +3,15 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getSessionUser: vi.fn(),
-  userUpdate: vi.fn(),
+  updateUserProfile: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({
   getSessionUser: mocks.getSessionUser,
 }));
 
-vi.mock("@/lib/db", () => ({
-  prisma: {
-    user: {
-      update: mocks.userUpdate,
-    },
-  },
+vi.mock("@/lib/data", () => ({
+  updateUserProfile: mocks.updateUserProfile,
 }));
 
 import { GET, PATCH } from "@/app/api/me/route";
@@ -27,6 +23,9 @@ const sessionUser = {
   city: "上海",
   roleTag: "talent",
   bio: "全栈工程师",
+  skills: ["全栈", "AI大模型"],
+  yearsExperience: 12,
+  isVerified: false,
   isAdmin: false,
   createdAt: new Date("2026-01-01"),
 };
@@ -42,14 +41,18 @@ function patchRequest(body: unknown): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getSessionUser.mockResolvedValue(sessionUser);
-  mocks.userUpdate.mockResolvedValue(sessionUser);
+  mocks.updateUserProfile.mockResolvedValue(sessionUser);
 });
 
 describe("GET /api/me", () => {
-  it("returns only safe profile fields", async () => {
+  it("requires a session", async () => {
+    mocks.getSessionUser.mockResolvedValue(null);
     const response = await GET();
+    expect(response.status).toBe(401);
+  });
 
-    expect(response.status).toBe(200);
+  it("returns the safe user payload", async () => {
+    const response = await GET();
     await expect(response.json()).resolves.toEqual({
       ok: true,
       user: {
@@ -59,54 +62,72 @@ describe("GET /api/me", () => {
         city: "上海",
         roleTag: "talent",
         bio: "全栈工程师",
+        skills: ["全栈", "AI大模型"],
+        yearsExperience: 12,
+        isVerified: false,
         isAdmin: false,
       },
     });
   });
-
-  it("rejects an anonymous request", async () => {
-    mocks.getSessionUser.mockResolvedValue(null);
-
-    const response = await GET();
-
-    expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({ ok: false });
-  });
 });
 
 describe("PATCH /api/me", () => {
-  it("trims and saves a valid onboarding profile", async () => {
+  it("requires a session", async () => {
+    mocks.getSessionUser.mockResolvedValue(null);
+    const response = await PATCH(patchRequest({}));
+    expect(response.status).toBe(401);
+    expect(mocks.updateUserProfile).not.toHaveBeenCalled();
+  });
+
+  it("updates nickname, city, role and profile extras", async () => {
     const response = await PATCH(
       patchRequest({
-        nickname: "  新用户  ",
-        city: "杭州",
+        nickname: " 新昵称 ",
+        city: "深圳",
         roleTag: "founder",
-        bio: "  正在寻找技术合伙人  ",
+        bio: "新的简介",
+        skills: ["出海", "Agent"],
+        yearsExperience: 15,
       }),
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.userUpdate).toHaveBeenCalledWith({
-      where: { id: "user-1" },
-      data: {
-        nickname: "新用户",
-        city: "杭州",
-        roleTag: "founder",
-        bio: "正在寻找技术合伙人",
-      },
+    expect(mocks.updateUserProfile).toHaveBeenCalledWith("user-1", {
+      nickname: "新昵称",
+      city: "深圳",
+      roleTag: "founder",
+      bio: "新的简介",
+      skills: ["出海", "Agent"],
+      yearsExperience: 15,
     });
   });
 
-  it("rejects invalid cities and roles without updating", async () => {
+  it("rejects missing nickname or city", async () => {
+    const response = await PATCH(
+      patchRequest({ nickname: "", city: "深圳", roleTag: "founder" }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "请填写昵称和城市",
+    });
+    expect(mocks.updateUserProfile).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid role", async () => {
     const response = await PATCH(
       patchRequest({
-        nickname: "新用户",
-        city: "火星",
-        roleTag: "administrator",
+        nickname: "小明",
+        city: "上海",
+        roleTag: "hacker",
       }),
     );
 
     expect(response.status).toBe(400);
-    expect(mocks.userUpdate).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "请选择身份",
+    });
   });
 });

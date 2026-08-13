@@ -1,6 +1,6 @@
 # 阿里云部署与上线检查
 
-本文面向阿里云 ECS 或轻量应用服务器的单机部署。生产数据库建议使用同地域的 RDS PostgreSQL，不要把数据库直接暴露到公网。
+本文面向阿里云 ECS 或轻量应用服务器的单机部署。数据库使用 **Supabase 托管 PostgreSQL**（表统一 `sf_` 前缀），应用通过 supabase-js（service_role，REST）访问，无需数据库连接串，也不向公网暴露数据库。
 
 ## 1. 准备服务器
 
@@ -27,35 +27,35 @@ chmod 600 .env
 
 逐项设置以下变量：
 
-- `DATABASE_URL`：RDS PostgreSQL 连接串，优先使用内网地址并启用强密码。
-- `SESSION_SECRET`：生产专用的高强度随机值。
+- `SUPABASE_PROJECT_ID` / `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`：Supabase 项目标识与密钥，仅在服务端使用 service_role，切勿把 service_role 暴露给浏览器。
 - `SMS_ACCESS_KEY_ID`、`SMS_ACCESS_KEY_SECRET`：仅授予短信发送所需的最小权限。
 - `SMS_SIGN_NAME`、`SMS_TEMPLATE_CODE`：阿里云短信控制台审核通过的签名和验证码模板。
 - `SMS_DRY_RUN=false`：生产环境必须显式关闭模拟发送；上线前先用真实大陆手机号验证。
-- `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL`：按实际模型服务配置。
+- `OPENAI_COMPATIBLE_BASE_URL`、`OPENAI_COMPATIBLE_API_KEY`、`OPENAI_COMPATIBLE_MODEL`：AI 润色用的 OpenAI 兼容端点（默认 DeepSeek，需大陆可访问）。
 - `ADMIN_PHONES`：逗号分隔的管理员手机号，不要沿用示例号码。
 
 在阿里云短信控制台完成资质、签名和验证码模板审核，并检查套餐余量、发送频控和告警。切勿在日志中输出 AccessKey、完整验证码或手机号。
 
-## 3. 构建、迁移与种子数据
+## 3. 构建与种子数据
 
-部署新版本时先安装锁定依赖，再执行生产迁移和构建：
+部署新版本时安装锁定依赖并构建：
 
 ```bash
 cd /srv/ai-partner-marketplace
 npm ci
-npx prisma generate
-npx prisma migrate deploy
 npm run build
 ```
 
-首次上线可在确认连接的是正确生产库后导入演示内容：
+首次上线可在确认连接的是正确 Supabase 项目后导入演示内容：
 
 ```bash
-npx prisma db seed
+npm run seed
 ```
 
-种子脚本会幂等写入两个虚构账号和演示帖子。正式邀请用户前检查内容是否展示正常。为 RDS 开启自动备份和按时间点恢复，并在迁移前创建手动快照；定期演练恢复流程。
+种子脚本会幂等写入两个虚构账号和演示帖子。正式邀请用户前检查内容是否展示正常。
+
+表结构变更：把 SQL 追加到 `supabase/migrations/` 后执行
+`supabase db query --linked --file supabase/migrations/<file>.sql`（需要本地 CLI 已 `supabase login`）。Supabase 自带自动备份与按时间点恢复；变更前在 Dashboard 创建手动备份，并定期演练恢复流程。
 
 ## 4. 使用 PM2 或 systemd 运行
 

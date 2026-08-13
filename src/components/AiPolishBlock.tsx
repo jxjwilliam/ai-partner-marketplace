@@ -47,7 +47,7 @@ export default function AiPolishBlock({ type, fields, onAdopt }: Props) {
   }
 
   return (
-    <aside className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
+    <aside className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="font-semibold text-slate-900">AI 文案助手</h2>
@@ -56,7 +56,7 @@ export default function AiPolishBlock({ type, fields, onAdopt }: Props) {
           </p>
         </div>
         <button
-          className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+          className="shrink-0 rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
           disabled={loading}
           type="button"
           onClick={polish}
@@ -86,7 +86,7 @@ export default function AiPolishBlock({ type, fields, onAdopt }: Props) {
           </dl>
           <div className="mt-4 flex gap-3">
             <button
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white"
+              className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white"
               type="button"
               onClick={adopt}
             >

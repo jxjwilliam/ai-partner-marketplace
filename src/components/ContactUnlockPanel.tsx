@@ -53,31 +53,31 @@ export default function ContactUnlockPanel({
   }
 
   return (
-    <section className="border border-indigo-200 bg-indigo-50 p-5">
-      <h2 className="font-semibold text-indigo-950">联系发布者</h2>
+    <section className="border border-cyan-200 bg-cyan-50 p-5">
+      <h2 className="font-semibold text-cyan-950">联系发布者</h2>
 
       {contact ? (
         <>
-          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-indigo-500">
+          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-cyan-500">
             联系方式
           </p>
-          <p className="mt-1 whitespace-pre-wrap wrap-break-word text-sm font-medium text-indigo-950">
+          <p className="mt-1 whitespace-pre-wrap wrap-break-word text-sm font-medium text-cyan-950">
             {contact}
           </p>
         </>
       ) : isAuthor ? (
-        <p className="mt-2 text-sm leading-6 text-indigo-700">
+        <p className="mt-2 text-sm leading-6 text-cyan-700">
           这是你的帖子，联系方式仅对你和获批申请人可见。
         </p>
       ) : !loggedIn ? (
         <Link
-          className="mt-4 block bg-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-indigo-700"
+          className="mt-4 block bg-cyan-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-cyan-700"
           href={`/login?next=/posts/${postId}`}
         >
           请先登录后申请
         </Link>
       ) : status === "pending" ? (
-        <p className="mt-2 text-sm leading-6 text-indigo-700">
+        <p className="mt-2 text-sm leading-6 text-cyan-700">
           申请已提交，等待发布者处理。
         </p>
       ) : (
@@ -88,10 +88,10 @@ export default function ContactUnlockPanel({
             </p>
           )}
           <form className="mt-4 space-y-3" onSubmit={submit}>
-            <label className="block text-sm font-medium text-indigo-950">
+            <label className="block text-sm font-medium text-cyan-950">
               简单介绍你的背景和合作意向
               <textarea
-                className="mt-2 min-h-24 w-full resize-y border border-indigo-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-500"
+                className="mt-2 min-h-24 w-full resize-y border border-cyan-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-cyan-500"
                 value={message}
                 onChange={(event) => setMessage(event.target.value)}
                 minLength={UNLOCK_MIN_MESSAGE_LEN}
@@ -105,7 +105,7 @@ export default function ContactUnlockPanel({
               </p>
             )}
             <button
-              className="w-full bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+              className="w-full bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-cyan-700 disabled:opacity-60"
               disabled={submitting}
               type="submit"
             >

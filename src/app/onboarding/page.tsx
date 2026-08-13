@@ -10,6 +10,13 @@ const ROLE_OPTIONS = [
   { value: "other", label: "其他" },
 ] as const;
 
+const YEARS_OPTIONS = [
+  { value: "", label: "选择经验年限" },
+  { value: "5", label: "5 - 9 年" },
+  { value: "10", label: "10 - 14 年" },
+  { value: "15", label: "15 年以上" },
+] as const;
+
 type ApiResponse = {
   ok?: boolean;
   error?: string;
@@ -20,6 +27,8 @@ export default function OnboardingPage() {
   const [city, setCity] = useState("");
   const [roleTag, setRoleTag] = useState("");
   const [bio, setBio] = useState("");
+  const [skills, setSkills] = useState("");
+  const [yearsExperience, setYearsExperience] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -32,7 +41,17 @@ export default function OnboardingPage() {
       const response = await fetch("/api/me", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ nickname, city, roleTag, bio }),
+        body: JSON.stringify({
+          nickname,
+          city,
+          roleTag,
+          bio,
+          skills: skills
+            .split(/[,，]/)
+            .map((item) => item.trim())
+            .filter(Boolean),
+          yearsExperience: yearsExperience || undefined,
+        }),
       });
       const result = (await response.json()) as ApiResponse;
       if (!response.ok || !result.ok) {
@@ -50,8 +69,8 @@ export default function OnboardingPage() {
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12 sm:py-16">
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-10">
-        <p className="text-sm font-medium text-indigo-600">只需一分钟</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950">
+        <p className="text-sm font-medium text-cyan-600">只需一分钟</p>
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-[#1F3A5F]">
           完善个人资料
         </h1>
         <p className="mt-3 text-sm leading-6 text-slate-500">
@@ -62,7 +81,7 @@ export default function OnboardingPage() {
           <label className="block text-sm font-medium text-slate-700">
             昵称
             <input
-              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
               value={nickname}
               onChange={(event) => setNickname(event.target.value)}
               maxLength={32}
@@ -74,7 +93,7 @@ export default function OnboardingPage() {
           <label className="block text-sm font-medium text-slate-700">
             城市
             <select
-              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
               value={city}
               onChange={(event) => setCity(event.target.value)}
               required
@@ -90,6 +109,34 @@ export default function OnboardingPage() {
             </select>
           </label>
 
+          <label className="block text-sm font-medium text-slate-700">
+            技能方向
+            <span className="ml-2 font-normal text-slate-400">选填，逗号分隔</span>
+            <input
+              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+              value={skills}
+              onChange={(event) => setSkills(event.target.value)}
+              maxLength={120}
+              placeholder="例如：AI大模型, 全栈, 架构师"
+            />
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700">
+            经验年限
+            <span className="ml-2 font-normal text-slate-400">选填</span>
+            <select
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
+              value={yearsExperience}
+              onChange={(event) => setYearsExperience(event.target.value)}
+            >
+              {YEARS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <fieldset>
             <legend className="text-sm font-medium text-slate-700">我的身份</legend>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -97,13 +144,13 @@ export default function OnboardingPage() {
                 <label
                   className={`cursor-pointer rounded-xl border px-4 py-3 text-sm transition ${
                     roleTag === option.value
-                      ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                      ? "border-cyan-500 bg-cyan-50 text-cyan-700"
                       : "border-slate-300 text-slate-700 hover:border-slate-400"
                   }`}
                   key={option.value}
                 >
                   <input
-                    className="mr-2 accent-indigo-600"
+                    className="mr-2 accent-cyan-600"
                     type="radio"
                     name="roleTag"
                     value={option.value}
@@ -121,7 +168,7 @@ export default function OnboardingPage() {
             个人简介
             <span className="ml-2 font-normal text-slate-400">选填</span>
             <textarea
-              className="mt-2 min-h-28 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+              className="mt-2 min-h-28 w-full resize-y rounded-xl border border-slate-300 px-4 py-3 text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
               value={bio}
               onChange={(event) => setBio(event.target.value)}
               maxLength={200}
@@ -139,7 +186,7 @@ export default function OnboardingPage() {
           )}
 
           <button
-            className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-xl bg-[#1F3A5F] px-4 py-3 font-semibold text-white transition hover:bg-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={submitting}
             type="submit"
           >

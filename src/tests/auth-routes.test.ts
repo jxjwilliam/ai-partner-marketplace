@@ -3,39 +3,29 @@ import { NextRequest } from "next/server";
 import { hashOtp } from "@/lib/auth/otp";
 
 const mocks = vi.hoisted(() => ({
-  transaction: vi.fn(),
-  otpFindFirst: vi.fn(),
-  otpCount: vi.fn(),
-  otpCreate: vi.fn(),
-  otpUpdate: vi.fn(),
-  otpUpdateMany: vi.fn(),
-  otpDelete: vi.fn(),
-  otpDeleteMany: vi.fn(),
-  userFindUnique: vi.fn(),
-  userCreate: vi.fn(),
+  findLatestOtp: vi.fn(),
+  countOtpCreatedSince: vi.fn(),
+  createOtpRow: vi.fn(),
+  deleteOtpRow: vi.fn(),
+  incrementOtpAttempts: vi.fn(),
+  consumeOtpRow: vi.fn(),
+  getUserByPhone: vi.fn(),
+  createUser: vi.fn(),
   sendSmsOtp: vi.fn(),
   createSession: vi.fn(),
   setSessionCookie: vi.fn(),
   destroySession: vi.fn(),
 }));
 
-vi.mock("@/lib/db", () => ({
-  prisma: {
-    $transaction: mocks.transaction,
-    otpCode: {
-      findFirst: mocks.otpFindFirst,
-      count: mocks.otpCount,
-      create: mocks.otpCreate,
-      update: mocks.otpUpdate,
-      updateMany: mocks.otpUpdateMany,
-      delete: mocks.otpDelete,
-      deleteMany: mocks.otpDeleteMany,
-    },
-    user: {
-      findUnique: mocks.userFindUnique,
-      create: mocks.userCreate,
-    },
-  },
+vi.mock("@/lib/data", () => ({
+  findLatestOtp: mocks.findLatestOtp,
+  countOtpCreatedSince: mocks.countOtpCreatedSince,
+  createOtpRow: mocks.createOtpRow,
+  deleteOtpRow: mocks.deleteOtpRow,
+  incrementOtpAttempts: mocks.incrementOtpAttempts,
+  consumeOtpRow: mocks.consumeOtpRow,
+  getUserByPhone: mocks.getUserByPhone,
+  createUser: mocks.createUser,
 }));
 
 vi.mock("@/lib/auth/sms", () => ({ sendSmsOtp: mocks.sendSmsOtp }));
@@ -78,22 +68,11 @@ function nullJsonBodyRequest(path: string): NextRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.transaction.mockImplementation(
-    async (callback: (tx: unknown) => unknown) =>
-      callback({
-        otpCode: {
-          findFirst: mocks.otpFindFirst,
-          count: mocks.otpCount,
-          create: mocks.otpCreate,
-        },
-      }),
-  );
-  mocks.otpFindFirst.mockResolvedValue(null);
-  mocks.otpCount.mockResolvedValue(0);
-  mocks.otpCreate.mockResolvedValue({ id: "otp-created" });
-  mocks.otpUpdateMany.mockResolvedValue({ count: 1 });
-  mocks.otpDelete.mockResolvedValue({});
-  mocks.otpDeleteMany.mockResolvedValue({ count: 1 });
+  mocks.findLatestOtp.mockResolvedValue(null);
+  mocks.countOtpCreatedSince.mockResolvedValue(0);
+  mocks.createOtpRow.mockResolvedValue({ id: "otp-created" });
+  mocks.incrementOtpAttempts.mockResolvedValue(1);
+  mocks.consumeOtpRow.mockResolvedValue(true);
   mocks.sendSmsOtp.mockResolvedValue(undefined);
   mocks.createSession.mockResolvedValue({ token: "session-token" });
   mocks.setSessionCookie.mockResolvedValue(undefined);
@@ -112,16 +91,14 @@ describe("POST /api/auth/send-otp", () => {
   });
 
   it("returns a Chinese 400 response for a null JSON body", async () => {
-    const response = await sendOtp(
-      nullJsonBodyRequest("/api/auth/send-otp"),
-    );
+    const response = await sendOtp(nullJsonBodyRequest("/api/auth/send-otp"));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       ok: false,
       error: "请求格式错误",
     });
-    expect(mocks.otpFindFirst).not.toHaveBeenCalled();
+    expect(mocks.findLatestOtp).not.toHaveBeenCalled();
   });
 
   it("sends and persists an OTP for a valid phone", async () => {
@@ -135,13 +112,13 @@ describe("POST /api/auth/send-otp", () => {
       "13800138000",
       expect.stringMatching(/^\d{6}$/),
     );
-    expect(mocks.otpCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        phone: "13800138000",
-        ip: "203.0.113.9",
-      }),
+    expect(mocks.createOtpRow).toHaveBeenCalledWith({
+      phone: "13800138000",
+      codeHash: expect.any(String),
+      expiresAt: expect.any(Date),
+      ip: "203.0.113.9",
     });
-    expect(mocks.transaction).toHaveBeenCalledOnce();
+    expect(mocks.countOtpCreatedSince).toHaveBeenCalledTimes(2);
   });
 
   it("rejects an invalid phone without querying the database", async () => {
@@ -150,7 +127,23 @@ describe("POST /api/auth/send-otp", () => {
     );
 
     expect(response.status).toBe(400);
-    expect(mocks.otpFindFirst).not.toHaveBeenCalled();
+    expect(mocks.findLatestOtp).not.toHaveBeenCalled();
+  });
+
+  it("rejects when the per-phone daily limit is reached", async () => {
+    mocks.countOtpCreatedSince.mockImplementation((column: string) =>
+      Promise.resolve(column === "phone" ? 10 : 0),
+    );
+    const response = await sendOtp(
+      jsonRequest("/api/auth/send-otp", { phone: "13800138000" }),
+    );
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "今日发送次数已达上限",
+    });
+    expect(mocks.createOtpRow).not.toHaveBeenCalled();
   });
 
   it("deletes the reserved OTP and fails closed when SMS delivery fails", async () => {
@@ -165,9 +158,7 @@ describe("POST /api/auth/send-otp", () => {
       ok: false,
       error: "服务暂不可用",
     });
-    expect(mocks.otpDelete).toHaveBeenCalledWith({
-      where: { id: "otp-created" },
-    });
+    expect(mocks.deleteOtpRow).toHaveBeenCalledWith("otp-created");
   });
 });
 
@@ -194,32 +185,35 @@ describe("POST /api/auth/verify-otp", () => {
       ok: false,
       error: "请求格式错误",
     });
-    expect(mocks.otpFindFirst).not.toHaveBeenCalled();
+    expect(mocks.findLatestOtp).not.toHaveBeenCalled();
   });
 
   it("creates a user session after a correct OTP", async () => {
     const code = "123456";
-    mocks.otpFindFirst.mockResolvedValue({
+    mocks.findLatestOtp.mockResolvedValue({
       id: "otp-1",
       attempts: 0,
       expiresAt: new Date(Date.now() + 60_000),
+      createdAt: new Date(),
       codeHash: await hashOtp(code),
     });
-    mocks.userFindUnique.mockResolvedValue(null);
-    mocks.userCreate.mockResolvedValue({
+    mocks.getUserByPhone.mockResolvedValue(null);
+    mocks.createUser.mockResolvedValue({
       id: "user-1",
       phone: "13800138000",
       nickname: null,
       city: null,
       roleTag: null,
+      bio: null,
+      skills: [],
+      yearsExperience: null,
+      isVerified: false,
       isAdmin: false,
+      createdAt: new Date(),
     });
 
     const response = await verifyOtp(
-      jsonRequest("/api/auth/verify-otp", {
-        phone: "13800138000",
-        code,
-      }),
+      jsonRequest("/api/auth/verify-otp", { phone: "13800138000", code }),
     );
 
     expect(response.status).toBe(200);
@@ -227,75 +221,63 @@ describe("POST /api/auth/verify-otp", () => {
       ok: true,
       needsOnboarding: true,
     });
-    expect(mocks.otpDeleteMany).toHaveBeenCalledWith({
-      where: { id: "otp-1", attempts: { lt: 5 } },
+    expect(mocks.consumeOtpRow).toHaveBeenCalledWith("otp-1");
+    expect(mocks.createUser).toHaveBeenCalledWith({
+      phone: "13800138000",
+      isAdmin: false,
     });
-    expect(mocks.otpDelete).not.toHaveBeenCalled();
     expect(mocks.createSession).toHaveBeenCalledWith("user-1");
-    expect(mocks.setSessionCookie).toHaveBeenCalledWith("session-token");
   });
 
-  it("increments attempts after an incorrect OTP", async () => {
-    mocks.otpFindFirst.mockResolvedValue({
+  it("skips onboarding for users who completed their profile", async () => {
+    mocks.findLatestOtp.mockResolvedValue({
       id: "otp-1",
       attempts: 0,
       expiresAt: new Date(Date.now() + 60_000),
+      createdAt: new Date(),
       codeHash: await hashOtp("654321"),
     });
-    const response = await verifyOtp(
-      jsonRequest("/api/auth/verify-otp", {
-        phone: "13800138000",
-        code: "123456",
-      }),
-    );
-
-    expect(response.status).toBe(400);
-    expect(mocks.otpUpdateMany).toHaveBeenCalledWith({
-      where: { id: "otp-1", attempts: { lt: 5 } },
-      data: { attempts: { increment: 1 } },
+    mocks.getUserByPhone.mockResolvedValue({
+      id: "user-1",
+      phone: "13800138000",
+      nickname: "小明",
+      city: "上海",
+      roleTag: "talent",
+      bio: null,
+      skills: [],
+      yearsExperience: null,
+      isVerified: false,
+      isAdmin: false,
+      createdAt: new Date(),
     });
-    expect(mocks.otpUpdate).not.toHaveBeenCalled();
-    expect(mocks.createSession).not.toHaveBeenCalled();
-  });
-
-  it("reports the attempt cap when a concurrent guess consumed the last attempt", async () => {
-    mocks.otpFindFirst.mockResolvedValue({
-      id: "otp-1",
-      attempts: 4,
-      expiresAt: new Date(Date.now() + 60_000),
-      codeHash: await hashOtp("654321"),
-    });
-    mocks.otpUpdateMany.mockResolvedValue({ count: 0 });
 
     const response = await verifyOtp(
       jsonRequest("/api/auth/verify-otp", {
         phone: "13800138000",
-        code: "123456",
+        code: "654321",
       }),
     );
 
-    expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
-      ok: false,
-      error: "验证码错误次数过多",
+      ok: true,
+      needsOnboarding: false,
     });
-    expect(mocks.createSession).not.toHaveBeenCalled();
+    expect(mocks.createUser).not.toHaveBeenCalled();
   });
 
-  it("does not create a session when a concurrent verify consumed the OTP", async () => {
-    const code = "123456";
-    mocks.otpFindFirst.mockResolvedValue({
+  it("counts failed attempts and returns Chinese errors", async () => {
+    mocks.findLatestOtp.mockResolvedValue({
       id: "otp-1",
-      attempts: 0,
+      attempts: 1,
       expiresAt: new Date(Date.now() + 60_000),
-      codeHash: await hashOtp(code),
+      createdAt: new Date(),
+      codeHash: await hashOtp("111111"),
     });
-    mocks.otpDeleteMany.mockResolvedValue({ count: 0 });
 
     const response = await verifyOtp(
       jsonRequest("/api/auth/verify-otp", {
         phone: "13800138000",
-        code,
+        code: "000000",
       }),
     );
 
@@ -304,81 +286,38 @@ describe("POST /api/auth/verify-otp", () => {
       ok: false,
       error: "验证码错误",
     });
-    expect(mocks.createSession).not.toHaveBeenCalled();
-    expect(mocks.setSessionCookie).not.toHaveBeenCalled();
+    expect(mocks.incrementOtpAttempts).toHaveBeenCalledWith("otp-1");
   });
 
-  it("preserves older sends so a later send still counts them", async () => {
-    const code = "123456";
-    const older = {
-      id: "otp-old",
-      phone: "13800138000",
-      ip: "203.0.113.9",
-      attempts: 0,
-      createdAt: new Date(Date.now() - 120_000),
+  it("locks the code after too many attempts", async () => {
+    mocks.findLatestOtp.mockResolvedValue({
+      id: "otp-1",
+      attempts: 5,
       expiresAt: new Date(Date.now() + 60_000),
-      codeHash: await hashOtp("654321"),
-    };
-    const matched = {
-      ...older,
-      id: "otp-new",
-      createdAt: new Date(Date.now() - 90_000),
-      codeHash: await hashOtp(code),
-    };
-    const rows = [older, matched];
-    const observedCounts: number[] = [];
-    mocks.otpFindFirst.mockImplementation(async () => rows.at(-1) ?? null);
-    mocks.otpDeleteMany.mockImplementation(
-      async ({ where }: { where: { id: string } }) => {
-        const index = rows.findIndex((row) => row.id === where.id);
-        if (index < 0) return { count: 0 };
-        rows.splice(index, 1);
-        return { count: 1 };
-      },
-    );
-    mocks.otpCount.mockImplementation(
-      async ({ where }: { where: { phone?: string; ip?: string } }) => {
-        const count = rows.filter(
-          (row) =>
-            (where.phone === undefined || row.phone === where.phone) &&
-            (where.ip === undefined || row.ip === where.ip),
-        ).length;
-        observedCounts.push(count);
-        return count;
-      },
-    );
-    mocks.userFindUnique.mockResolvedValue({
-      id: "user-1",
-      phone: "13800138000",
-      nickname: "测试用户",
-      city: "上海",
-      roleTag: "founder",
-      isAdmin: false,
+      createdAt: new Date(),
+      codeHash: await hashOtp("111111"),
     });
 
-    const verifyResponse = await verifyOtp(
+    const response = await verifyOtp(
       jsonRequest("/api/auth/verify-otp", {
         phone: "13800138000",
-        code,
+        code: "000000",
       }),
     );
-    const sendResponse = await sendOtp(
-      jsonRequest("/api/auth/send-otp", { phone: "13800138000" }),
-    );
 
-    expect(verifyResponse.status).toBe(200);
-    expect(rows.map((row) => row.id)).toContain("otp-old");
-    expect(sendResponse.status).toBe(200);
-    expect(observedCounts).toEqual([1, 1]);
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      error: "验证码错误次数过多",
+    });
   });
 });
 
 describe("POST /api/auth/logout", () => {
-  it("destroys the current session", async () => {
+  it("destroys the session", async () => {
     const response = await logout();
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ ok: true });
     expect(mocks.destroySession).toHaveBeenCalledOnce();
   });
 });

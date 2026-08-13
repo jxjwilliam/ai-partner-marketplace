@@ -3,29 +3,27 @@ import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   getSessionUser: vi.fn(),
-  postFindMany: vi.fn(),
-  postFindUnique: vi.fn(),
-  postCreate: vi.fn(),
-  postUpdate: vi.fn(),
-  unlockFindUnique: vi.fn(),
+  listPosts: vi.fn(),
+  createPost: vi.fn(),
+  getPostById: vi.fn(),
+  getPostAuthor: vi.fn(),
+  getUnlockStatus: vi.fn(),
+  incrementPostViews: vi.fn(),
+  updatePostStatusOrBump: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({
   getSessionUser: mocks.getSessionUser,
 }));
 
-vi.mock("@/lib/db", () => ({
-  prisma: {
-    post: {
-      findMany: mocks.postFindMany,
-      findUnique: mocks.postFindUnique,
-      create: mocks.postCreate,
-      update: mocks.postUpdate,
-    },
-    contactRequest: {
-      findUnique: mocks.unlockFindUnique,
-    },
-  },
+vi.mock("@/lib/data", () => ({
+  listPosts: mocks.listPosts,
+  createPost: mocks.createPost,
+  getPostById: mocks.getPostById,
+  getPostAuthor: mocks.getPostAuthor,
+  getUnlockStatus: mocks.getUnlockStatus,
+  incrementPostViews: mocks.incrementPostViews,
+  updatePostStatusOrBump: mocks.updatePostStatusOrBump,
 }));
 
 import { GET as listPosts, POST as createPost } from "@/app/api/posts/route";
@@ -34,11 +32,18 @@ import {
   PATCH as patchPost,
 } from "@/app/api/posts/[id]/route";
 
-const author = {
-  id: "author-1",
-  nickname: "创业者",
-  city: "上海",
-  roleTag: "founder",
+const viewer = {
+  id: "viewer-1",
+  phone: "13800138000",
+  nickname: "访客",
+  city: "北京",
+  roleTag: "talent",
+  bio: null,
+  skills: [],
+  yearsExperience: null,
+  isVerified: false,
+  isAdmin: false,
+  createdAt: new Date("2026-01-01"),
 };
 
 const post = {
@@ -48,24 +53,25 @@ const post = {
   title: "寻找技术合伙人",
   city: "上海",
   tags: ["AI大模型"],
-  bodyJson: { projectStage: "MVP" },
+  bodyJson: { intro: "已完成首版产品" },
   contactPrivate: "微信：founder",
   status: "active",
   viewCount: 3,
-  createdAt: new Date("2026-01-01"),
-  bumpedAt: new Date("2026-01-02"),
-  author,
-};
-
-const viewer = {
-  id: "viewer-1",
-  phone: "13800138000",
-  nickname: "访客",
-  city: "北京",
-  roleTag: "talent",
-  bio: null,
-  isAdmin: false,
-  createdAt: new Date("2026-01-01"),
+  createdAt: new Date("2026-07-01"),
+  bumpedAt: new Date("2026-07-02"),
+  author: {
+    id: "author-1",
+    phone: "13900000001",
+    nickname: "创业者",
+    city: "上海",
+    roleTag: "founder",
+    bio: null,
+    skills: [],
+    yearsExperience: null,
+    isVerified: true,
+    isAdmin: false,
+    createdAt: new Date("2026-07-01"),
+  },
 };
 
 function request(url: string, method = "GET", body?: unknown) {
@@ -79,11 +85,13 @@ function request(url: string, method = "GET", body?: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getSessionUser.mockResolvedValue(viewer);
-  mocks.postFindMany.mockResolvedValue([post]);
-  mocks.postFindUnique.mockResolvedValue(post);
-  mocks.postCreate.mockResolvedValue({ id: "created-1" });
-  mocks.postUpdate.mockResolvedValue({ ...post, viewCount: 4 });
-  mocks.unlockFindUnique.mockResolvedValue(null);
+  mocks.listPosts.mockResolvedValue({ posts: [post], hasMore: false });
+  mocks.createPost.mockResolvedValue({ id: "created-1" });
+  mocks.getPostById.mockResolvedValue(post);
+  mocks.getPostAuthor.mockResolvedValue({ authorId: "author-1", status: "active" });
+  mocks.getUnlockStatus.mockResolvedValue(null);
+  mocks.incrementPostViews.mockResolvedValue(4);
+  mocks.updatePostStatusOrBump.mockResolvedValue(undefined);
 });
 
 describe("GET /api/posts", () => {
@@ -97,36 +105,28 @@ describe("GET /api/posts", () => {
       ok: false,
       error: "类型无效",
     });
-    expect(mocks.postFindMany).not.toHaveBeenCalled();
+    expect(mocks.listPosts).not.toHaveBeenCalled();
   });
 
-  it("lists filtered active posts without private contact details", async () => {
+  it("lists filtered active posts with paging and search", async () => {
     const response = await listPosts(
       request(
-        "http://localhost/api/posts?city=上海&type=partner&tags=AI大模型,SaaS",
+        "http://localhost/api/posts?city=上海&type=partner&tags=AI大模型,SaaS&q=客服&sort=hot&page=2",
       ),
     );
 
-    expect(mocks.postFindMany).toHaveBeenCalledWith({
-      where: {
-        status: "active",
-        city: "上海",
-        type: "partner",
-        AND: [
-          { tags: { has: "AI大模型" } },
-          { tags: { has: "SaaS" } },
-        ],
-      },
-      orderBy: { bumpedAt: "desc" },
-      include: {
-        author: {
-          select: { id: true, nickname: true, city: true, roleTag: true },
-        },
-      },
-      take: 50,
+    expect(mocks.listPosts).toHaveBeenCalledWith({
+      city: "上海",
+      type: "partner",
+      tags: ["AI大模型", "SaaS"],
+      search: "客服",
+      sort: "hot",
+      page: 2,
     });
     const json = await response.json();
-    expect(json.posts[0]).not.toHaveProperty("contactPrivate");
+    expect(json.ok).toBe(true);
+    expect(json.hasMore).toBe(false);
+    expect(json.page).toBe(2);
   });
 });
 
@@ -139,7 +139,7 @@ describe("POST /api/posts", () => {
     );
 
     expect(response.status).toBe(401);
-    expect(mocks.postCreate).not.toHaveBeenCalled();
+    expect(mocks.createPost).not.toHaveBeenCalled();
   });
 
   it("validates and creates a post for the viewer", async () => {
@@ -162,17 +162,14 @@ describe("POST /api/posts", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.postCreate).toHaveBeenCalledWith({
-      data: {
-        authorId: "viewer-1",
-        type: "partner",
-        title: "寻找技术合伙人",
-        city: "上海",
-        tags: ["AI大模型"],
-        contactPrivate: "微信：founder",
-        bodyJson: input.body,
-      },
-      select: { id: true },
+    expect(mocks.createPost).toHaveBeenCalledWith({
+      authorId: "viewer-1",
+      type: "partner",
+      title: "寻找技术合伙人",
+      city: "上海",
+      tags: ["AI大模型"],
+      contactPrivate: "微信：founder",
+      body: input.body,
     });
     await expect(response.json()).resolves.toEqual({ ok: true, id: "created-1" });
   });
@@ -180,28 +177,25 @@ describe("POST /api/posts", () => {
 
 describe("GET /api/posts/[id]", () => {
   it("returns 404 for a hidden post viewed by another non-admin user", async () => {
-    mocks.postFindUnique.mockResolvedValue({ ...post, status: "hidden" });
+    mocks.getPostById.mockResolvedValue({ ...post, status: "hidden" });
 
     const response = await getPost(request("http://localhost/api/posts/post-1"), {
       params: Promise.resolve({ id: "post-1" }),
     });
 
     expect(response.status).toBe(404);
-    expect(mocks.postUpdate).not.toHaveBeenCalled();
+    expect(mocks.incrementPostViews).not.toHaveBeenCalled();
   });
 
   it("increments views and reveals approved contact details", async () => {
-    mocks.unlockFindUnique.mockResolvedValue({ status: "approved" });
-    mocks.postUpdate.mockResolvedValue({ ...post, viewCount: 99 });
+    mocks.getUnlockStatus.mockResolvedValue("approved");
+    mocks.incrementPostViews.mockResolvedValue(99);
 
     const response = await getPost(request("http://localhost/api/posts/post-1"), {
       params: Promise.resolve({ id: "post-1" }),
     });
 
-    expect(mocks.postUpdate).toHaveBeenCalledWith({
-      where: { id: "post-1" },
-      data: { viewCount: { increment: 1 } },
-    });
+    expect(mocks.incrementPostViews).toHaveBeenCalledWith("post-1");
     const json = await response.json();
     expect(json.post.contactPrivate).toBe("微信：founder");
     expect(json.post.viewCount).toBe(99);
@@ -225,7 +219,7 @@ describe("PATCH /api/posts/[id]", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(mocks.postUpdate).not.toHaveBeenCalled();
+    expect(mocks.updatePostStatusOrBump).not.toHaveBeenCalled();
   });
 
   it("lets an author hide and bump a post", async () => {
@@ -240,10 +234,10 @@ describe("PATCH /api/posts/[id]", () => {
     );
 
     expect(response.status).toBe(200);
-    const update = mocks.postUpdate.mock.calls[0][0];
-    expect(update.where).toEqual({ id: "post-1" });
-    expect(update.data.status).toBe("hidden");
-    expect(update.data.bumpedAt).toBeInstanceOf(Date);
+    expect(mocks.updatePostStatusOrBump).toHaveBeenCalledWith("post-1", {
+      hide: true,
+      bump: true,
+    });
   });
 
   it("lets an admin hide a post without bumping", async () => {
@@ -257,9 +251,10 @@ describe("PATCH /api/posts/[id]", () => {
     );
 
     expect(response.status).toBe(200);
-    const update = mocks.postUpdate.mock.calls[0][0];
-    expect(update.data.status).toBe("hidden");
-    expect(update.data.bumpedAt).toBeUndefined();
+    expect(mocks.updatePostStatusOrBump).toHaveBeenCalledWith("post-1", {
+      hide: true,
+      bump: false,
+    });
   });
 
   it("rejects admins who try to bump a post", async () => {
@@ -271,6 +266,6 @@ describe("PATCH /api/posts/[id]", () => {
     );
 
     expect(response.status).toBe(403);
-    expect(mocks.postUpdate).not.toHaveBeenCalled();
+    expect(mocks.updatePostStatusOrBump).not.toHaveBeenCalled();
   });
 });

@@ -28,11 +28,12 @@ That design **overrides** older drafts under `docs/` (Kimi PRD, Doubao/DeepSeek 
 | Routes / API | `src/app/` | App Router; Route Handlers under `src/app/api/` |
 | UI | `src/components/` | Keep pages thin; logic in lib where testable |
 | Auth | `src/lib/auth/` | OTP helpers, session cookie, SMS adapter |
-| Posts | `src/lib/posts/` | Zod `parsePostInput`, `buildPostWhere`, visibility |
+| Posts | `src/lib/posts/` | Zod `parsePostInput`, `buildPostWhere`（搜索/排序/分页）, visibility |
 | Unlock | `src/lib/unlock/` | `canCreateUnlockRequest`, `nextUnlockStatus` |
 | AI | `src/lib/ai/polish.ts` | Sanitize + OpenAI-compatible client |
-| Schema | `prisma/schema.prisma` | Tables mapped to snake_case via `@@map` |
-| Tests | `src/tests/` | Vitest; prefer unit + mocked route tests |
+| Data | `src/lib/data.ts` | 全部数据库访问集中于此（supabase-js + service_role，`sf_` 前缀表），路由不直接拼 REST |
+| Schema | `supabase/migrations/` | Supabase 托管 Postgres；表统一 `sf_` 前缀，迁移 SQL 由 CLI `db query --linked` 执行 |
+| Tests | `src/tests/` | Vitest; prefer unit + mocked `@/lib/data` route tests |
 
 Shared constants (cities, tags, rate limits): `src/lib/constants.ts`.
 
@@ -50,15 +51,23 @@ Shared constants (cities, tags, rate limits): `src/lib/constants.ts`.
 npm test              # required before claiming done
 npm run lint
 npm run build         # when touching routes/pages/types
-npx prisma validate   # when changing schema
+npm run seed          # after schema/data changes that affect seed
 ```
 
-Local SMS: `SMS_DRY_RUN=true` (codes in server logs). Do not commit `.env`.
+Local SMS: `SMS_DRY_RUN=true` (codes in server logs). Do not commit `.env` / `.env.local`.
+
+### Supabase 数据迁移
+
+- 表名统一 `sf_` 前缀，迁移 SQL 位于 `supabase/migrations/20260812000000_supabase_sf_prefix.sql`（已应用）。
+- 改表后把变更追加为新文件，并用 `supabase db query --linked --file <file>.sql` 执行（CLI 已登录时无需数据库密码）。
+- 新建外键若需在 REST 中嵌入，用真实表名嵌入（如 `sf_users(...)`、`sf_posts(...)`），不要用 Prisma 时代的虚拟别名。
+- service_role key 只能用于服务端，禁止下发到浏览器。
+- RLS 已在所有 `sf_` 表启用且无策略：匿名 anon 默认拒绝，仅 service_role 可读写。
 
 ### Testing expectations
 
 - Pure logic (OTP limits, filters, unlock state, polish sanitize) → unit tests with TDD when adding behavior.
-- Route auth/privacy paths → mocked Prisma/session tests that assert contact is stripped and Chinese errors return.
+- Route auth/privacy paths → mocked `@/lib/data` / session tests that assert contact is stripped and Chinese errors return.
 - Do not claim live SMS/RDS/browser verification unless you actually ran it against a reachable DB and real (or dry-run) SMS.
 
 ### Commits

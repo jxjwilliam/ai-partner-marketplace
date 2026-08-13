@@ -13,7 +13,8 @@ describe("集市首页", () => {
     expect(page).toContain("buildPostWhere");
     expect(page).toContain("searchParams");
     expect(page).toContain('split(",")');
-    expect(page).toContain("prisma.post.findMany");
+    expect(page).toContain("listPosts");
+    expect(page).toContain("countPostsByType");
     expect(page).toContain("暂无帖子，来发布第一条");
     expect(page).toContain("<FilterBar");
     expect(page).toContain("<PostCard");
@@ -45,9 +46,9 @@ describe("帖子详情页", () => {
     const page = source("src/app/posts/[id]/page.tsx");
     const panel = source("src/components/ContactUnlockPanel.tsx");
 
-    expect(page).toContain("prisma.post.findUnique");
+    expect(page).toContain("getPostById");
     expect(page).toContain("getSessionUser");
-    expect(page).toContain("viewCount: { increment: 1 }");
+    expect(page).toContain("incrementPostViews");
     expect(page).toContain("notFound()");
     expect(page).toContain("shouldRevealContact");
     expect(page).toContain("POST_TYPE_LABEL");
@@ -70,7 +71,7 @@ describe("个人中心", () => {
     expect(page).toContain("getSessionUser");
     expect(page).toContain('redirect("/login?next=/me")');
     expect(page).toContain("shouldRevealContact");
-    expect(page).toContain("contact: reveal ? item.post.contactPrivate : undefined");
+    expect(page).toContain("contact: reveal ? item.post!.contactPrivate : undefined");
     expect(dashboard).toContain("我的帖子");
     expect(dashboard).toContain("联系方式申请");
     expect(dashboard).toContain("/api/unlock/");

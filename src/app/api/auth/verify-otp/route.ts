@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 import {
   assertCanVerifyOtp,
   normalizePhone,
   verifyOtpHash,
 } from "@/lib/auth/otp";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
+import {
+  consumeOtpRow,
+  createUser,
+  findLatestOtp,
+  getUserByPhone,
+  incrementOtpAttempts,
+} from "@/lib/data";
 import { OTP_MAX_ATTEMPTS } from "@/lib/constants";
 
 export async function POST(request: NextRequest) {
@@ -37,10 +43,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const otp = await prisma.otpCode.findFirst({
-    where: { phone },
-    orderBy: { createdAt: "desc" },
-  });
+  const otp = await findLatestOtp(phone);
   if (!otp) {
     return NextResponse.json(
       { ok: false, error: "请先获取验证码" },
@@ -61,24 +64,19 @@ export async function POST(request: NextRequest) {
 
   const match = await verifyOtpHash(code, otp.codeHash);
   if (!match) {
-    const incremented = await prisma.otpCode.updateMany({
-      where: { id: otp.id, attempts: { lt: OTP_MAX_ATTEMPTS } },
-      data: { attempts: { increment: 1 } },
-    });
+    const attempts = await incrementOtpAttempts(otp.id);
     return NextResponse.json(
       {
         ok: false,
         error:
-          incremented.count === 0 ? "验证码错误次数过多" : "验证码错误",
+          attempts >= OTP_MAX_ATTEMPTS ? "验证码错误次数过多" : "验证码错误",
       },
       { status: 400 },
     );
   }
 
-  const consumed = await prisma.otpCode.deleteMany({
-    where: { id: otp.id, attempts: { lt: OTP_MAX_ATTEMPTS } },
-  });
-  if (consumed.count === 0) {
+  const consumed = await consumeOtpRow(otp.id);
+  if (!consumed) {
     return NextResponse.json(
       {
         ok: false,
@@ -94,11 +92,9 @@ export async function POST(request: NextRequest) {
   const adminPhones = (process.env.ADMIN_PHONES || "")
     .split(",")
     .map((value) => value.trim());
-  let user = await prisma.user.findUnique({ where: { phone } });
+  let user = await getUserByPhone(phone);
   if (!user) {
-    user = await prisma.user.create({
-      data: { phone, isAdmin: adminPhones.includes(phone) },
-    });
+    user = await createUser({ phone, isAdmin: adminPhones.includes(phone) });
   }
 
   const { token } = await createSession(user.id);

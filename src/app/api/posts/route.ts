@@ -1,8 +1,11 @@
-import type { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
-import { prisma } from "@/lib/db";
-import { buildPostWhere, isValidPostFilterType } from "@/lib/posts/filters";
+import { createPost, listPosts } from "@/lib/data";
+import {
+  buildPostWhere,
+  isPostSort,
+  isValidPostFilterType,
+} from "@/lib/posts/filters";
 import { parsePostInput } from "@/lib/posts/schemas";
 
 export async function GET(req: NextRequest) {
@@ -20,29 +23,24 @@ export async function GET(req: NextRequest) {
     ?.split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
+  const sortValue = params.get("sort") ?? "";
+  const sort = isPostSort(sortValue) ? sortValue : "latest";
+  const search = params.get("q") ?? undefined;
+  const page = Math.max(1, Number(params.get("page")) || 1);
 
-  const posts = await prisma.post.findMany({
-    where: buildPostWhere({
-      city: params.get("city") ?? undefined,
-      type: type ?? undefined,
-      tags,
-    }),
-    orderBy: { bumpedAt: "desc" },
-    include: {
-      author: {
-        select: { id: true, nickname: true, city: true, roleTag: true },
-      },
-    },
-    take: 50,
+  const where = buildPostWhere({
+    city: params.get("city") ?? undefined,
+    type: type ?? undefined,
+    tags,
+    search,
+  });
+  const { posts, hasMore } = await listPosts({
+    ...where,
+    sort,
+    page,
   });
 
-  return NextResponse.json({
-    ok: true,
-    posts: posts.map(({ contactPrivate, ...post }) => {
-      void contactPrivate;
-      return post;
-    }),
-  });
+  return NextResponse.json({ ok: true, posts, hasMore, page });
 }
 
 export async function POST(req: NextRequest) {
@@ -73,13 +71,10 @@ export async function POST(req: NextRequest) {
   }
 
   const { body, ...fields } = parsed.data;
-  const post = await prisma.post.create({
-    data: {
-      ...fields,
-      authorId: user.id,
-      bodyJson: body as Prisma.InputJsonValue,
-    },
-    select: { id: true },
+  const post = await createPost({
+    ...fields,
+    authorId: user.id,
+    body,
   });
 
   return NextResponse.json({ ok: true, id: post.id });

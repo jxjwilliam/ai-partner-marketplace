@@ -82,7 +82,7 @@ export default function LoginPage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 items-center px-6 py-16">
       <section className="w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-        <p className="mb-3 text-sm font-medium text-indigo-600">AI合伙人集市</p>
+        <p className="mb-3 text-sm font-medium text-cyan-600">AI合伙人集市</p>
         <h1 className="text-3xl font-bold tracking-tight text-slate-950">登录</h1>
         <p className="mt-3 text-sm leading-6 text-slate-500">
           使用手机号登录，寻找下一位事业合伙人。
@@ -93,7 +93,7 @@ export default function LoginPage() {
             <label className="block text-sm font-medium text-slate-700">
               手机号
               <input
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
                 inputMode="tel"
@@ -108,7 +108,7 @@ export default function LoginPage() {
               </p>
             )}
             <button
-              className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-xl bg-cyan-600 px-4 py-3 font-semibold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={submitting}
               type="submit"
             >
@@ -121,7 +121,7 @@ export default function LoginPage() {
               <label className="block text-sm font-medium text-slate-700">
                 验证码
                 <input
-                  className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-base tracking-[0.3em] text-slate-950 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                  className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-base tracking-[0.3em] text-slate-950 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
                   value={code}
                   onChange={(event) => setCode(event.target.value)}
                   inputMode="numeric"
@@ -133,7 +133,7 @@ export default function LoginPage() {
                 />
               </label>
               <button
-                className="mt-2 text-sm text-indigo-600 hover:text-indigo-700"
+                className="mt-2 text-sm text-cyan-600 hover:text-cyan-700"
                 type="button"
                 onClick={() => {
                   setStep("phone");
@@ -156,7 +156,7 @@ export default function LoginPage() {
               </p>
             )}
             <button
-              className="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-xl bg-cyan-600 px-4 py-3 font-semibold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={submitting}
               type="submit"
             >

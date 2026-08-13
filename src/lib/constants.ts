@@ -19,6 +19,8 @@ export const TAGS = [
   "股权合伙",
 ] as const;
 
+export const HOME_PAGE_SIZE = 20;
+
 export const SESSION_COOKIE = "aim_session";
 export const SESSION_DAYS = 30;
 export const OTP_TTL_MS = 5 * 60 * 1000;

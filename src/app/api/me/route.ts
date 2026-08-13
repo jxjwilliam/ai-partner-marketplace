@@ -1,8 +1,8 @@
-import type { RoleTag, User } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
+import { updateUserProfile } from "@/lib/data";
 import { FILTER_CITIES } from "@/lib/constants";
-import { prisma } from "@/lib/db";
+import type { RoleTag, User } from "@/lib/types";
 
 const ROLE_TAGS: RoleTag[] = ["talent", "founder", "investor", "other"];
 
@@ -14,6 +14,9 @@ function safeUser(user: User) {
     city: user.city,
     roleTag: user.roleTag,
     bio: user.bio,
+    skills: user.skills,
+    yearsExperience: user.yearsExperience,
+    isVerified: user.isVerified,
     isAdmin: user.isAdmin,
   };
 }
@@ -23,7 +26,6 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
-
   return NextResponse.json({ ok: true, user: safeUser(user) });
 }
 
@@ -55,6 +57,18 @@ export async function PATCH(req: NextRequest) {
   const roleTag = String(body.roleTag ?? "") as RoleTag;
   const bio =
     body.bio == null ? undefined : String(body.bio).trim().slice(0, 200);
+  const rawSkills = body.skills;
+  const skills = Array.isArray(rawSkills)
+    ? rawSkills
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+        .slice(0, 12)
+    : undefined;
+  const rawYears = body.yearsExperience;
+  const yearsExperience =
+    rawYears == null || rawYears === ""
+      ? undefined
+      : Number(rawYears);
 
   if (
     !nickname ||
@@ -72,9 +86,18 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  const updated = await prisma.user.update({
-    where: { id: user.id },
-    data: { nickname, city, roleTag, bio },
+  const updated = await updateUserProfile(user.id, {
+    nickname,
+    city,
+    roleTag,
+    bio,
+    skills,
+    yearsExperience:
+      yearsExperience !== undefined && Number.isFinite(yearsExperience)
+        ? yearsExperience
+        : yearsExperience !== undefined
+          ? null
+          : undefined,
   });
 
   return NextResponse.json({ ok: true, user: safeUser(updated) });

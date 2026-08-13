@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
-import { prisma } from "@/lib/db";
+import { decideUnlockRequest, getUnlockRequest } from "@/lib/data";
 import { nextUnlockStatus } from "@/lib/unlock/state";
 
 type RouteContext = {
@@ -31,14 +31,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
   }
 
   const { requestId } = await context.params;
-  const unlock = await prisma.contactRequest.findUnique({
-    where: { id: requestId },
-    select: {
-      id: true,
-      status: true,
-      post: { select: { authorId: true } },
-    },
-  });
+  const unlock = await getUnlockRequest(requestId);
   if (!unlock) return error("申请不存在", 404);
   if (unlock.post.authorId !== user.id) return error("无权处理此申请", 403);
 
@@ -49,11 +42,8 @@ export async function POST(req: NextRequest, context: RouteContext) {
     return error("申请已处理", 409);
   }
 
-  const updated = await prisma.contactRequest.updateMany({
-    where: { id: requestId, status: "pending" },
-    data: { status, decidedAt: new Date() },
-  });
-  if (updated.count === 0) return error("申请已处理", 409);
+  const updated = await decideUnlockRequest(requestId, status);
+  if (!updated) return error("申请已处理", 409);
 
   return NextResponse.json({
     ok: true,

@@ -42,8 +42,8 @@ export async function polishFields(
   type: string,
   fields: Record<string, string>,
 ): Promise<Record<string, string>> {
-  const apiKey = process.env.LLM_API_KEY;
-  const baseUrl = process.env.LLM_BASE_URL;
+  const apiKey = process.env.OPENAI_COMPATIBLE_API_KEY;
+  const baseUrl = process.env.OPENAI_COMPATIBLE_BASE_URL;
   if (!apiKey || !baseUrl) throw new Error("LLM not configured");
 
   const safeFields = sanitizePolishFields(fields);
@@ -54,7 +54,7 @@ export async function polishFields(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: process.env.LLM_MODEL || "qwen-plus",
+      model: process.env.OPENAI_COMPATIBLE_MODEL || "qwen-plus",
       messages: [
         {
           role: "system",
