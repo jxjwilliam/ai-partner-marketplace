@@ -468,6 +468,24 @@ export async function getCachedRecommendations(
   }));
 }
 
+export async function getRecommendationForPost(
+  userId: string,
+  postId: string,
+): Promise<CachedRecommendation | null> {
+  const { data } = await supabase
+    .from("sf_recommendations")
+    .select("post_id,score,reason")
+    .eq("user_id", userId)
+    .eq("post_id", postId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    postId: data.post_id,
+    score: Number(data.score) || 0,
+    reason: data.reason ?? "",
+  };
+}
+
 export async function upsertRecommendations(
   userId: string,
   rows: Array<{ postId: string; score: number; reason: string }>,

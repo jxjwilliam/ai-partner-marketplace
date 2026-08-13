@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getSessionUser: vi.fn(),
   recommendForUser: vi.fn(),
   getPostsByIds: vi.fn(),
+  clearUserRecommendations: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({
@@ -15,6 +16,7 @@ vi.mock("@/lib/ai/match", () => ({
 }));
 vi.mock("@/lib/data", () => ({
   getPostsByIds: mocks.getPostsByIds,
+  clearUserRecommendations: mocks.clearUserRecommendations,
 }));
 
 import { GET } from "@/app/api/recommendations/route";
@@ -57,6 +59,7 @@ beforeEach(() => {
       author: null,
     },
   ]);
+  mocks.clearUserRecommendations.mockResolvedValue(undefined);
 });
 
 describe("GET /api/recommendations", () => {
@@ -84,5 +87,12 @@ describe("GET /api/recommendations", () => {
     mocks.recommendForUser.mockRejectedValue(new Error("LLM down"));
     const response = await GET(request("http://localhost/api/recommendations"));
     expect(response.status).toBe(503);
+  });
+
+  it("clears the cache and recomputes when refresh=1", async () => {
+    await GET(
+      request("http://localhost/api/recommendations?refresh=1&limit=1"),
+    );
+    expect(mocks.clearUserRecommendations).toHaveBeenCalledWith("user-1");
   });
 });

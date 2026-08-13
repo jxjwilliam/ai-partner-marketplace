@@ -40,6 +40,14 @@ export default async function SiteHeader() {
           >
             发布
           </Link>
+          {user && (
+            <Link
+              className="transition hover:text-[#1F3A5F]"
+              href="/recommendations"
+            >
+              推荐
+            </Link>
+          )}
           <Link
             className="rounded-lg bg-[#1F3A5F] px-3 py-2 text-white transition hover:bg-cyan-600"
             href={user ? "/me" : "/login"}

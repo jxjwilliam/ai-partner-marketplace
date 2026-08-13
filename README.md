@@ -14,7 +14,7 @@
 - 分类入口卡片（实时数量）+ 发布者「已认证」徽章
 - 联系方式申请解锁（作者同意后才可见）
 - 发帖 AI 润色（采用 / 放弃；失败不影响发布）
-- **AI 匹配推荐**：登录用户首页展示「为你推荐」——技能/城市/身份规则评分 + LLM 生成一句推荐理由（30 分钟缓存，失败自动降级为规则文案）
+- **AI 匹配推荐**：首页「为你推荐」+ 独立推荐页 `/recommendations`（支持手动刷新）——技能/城市/身份规则评分 + LLM 生成一句推荐理由（30 分钟缓存，失败自动降级为规则文案）；推荐帖详情页展示「AI 认为这条适合你」
 - 个人中心：我的帖子（隐藏/刷新）、解锁申请（收/发）、**技能方向与经验年限**
 - 管理员手机号可软隐藏垃圾帖
 - 品牌视觉：深蓝 `#1F3A5F` + 活力青 `#06B6D4`，专业极简商务风
@@ -146,8 +146,12 @@ Private project (`package.json` `"private": true`).
 | --- | --- | --- |
 | ![Home](screenshots/home.png) | ![Post Detail](screenshots/post-detail.png) | ![Publish](screenshots/publish.png) |
 
-| Search | AI Recommendations | Me |
+| Search | AI Recommendations | Recommendations |
 | --- | --- | --- |
-| ![Search](screenshots/home-search.png) | ![AI Recommendations](screenshots/home-recommendations.png) | ![Me](screenshots/me.png) |
+| ![Search](screenshots/home-search.png) | ![AI Recommendations](screenshots/home-recommendations.png) | ![Recommendations](screenshots/recommendations.png) |
+
+| Login | Me | |
+| --- | --- | --- |
+| ![Login](screenshots/login.png) | ![Me](screenshots/me.png) | |
 
 <!-- /screenshots -->

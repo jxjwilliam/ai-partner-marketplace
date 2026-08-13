@@ -49,6 +49,7 @@ export async function polishFields(
   const safeFields = sanitizePolishFields(fields);
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
+    signal: AbortSignal.timeout(15_000),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",

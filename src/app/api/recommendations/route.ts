@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth/session";
-import { getPostsByIds } from "@/lib/data";
+import { clearUserRecommendations, getPostsByIds } from "@/lib/data";
 import { recommendForUser } from "@/lib/ai/match";
 
 export async function GET(req: NextRequest) {
@@ -16,8 +16,10 @@ export async function GET(req: NextRequest) {
     5,
     Math.max(1, Number(req.nextUrl.searchParams.get("limit")) || 3),
   );
+  const refresh = req.nextUrl.searchParams.get("refresh") === "1";
 
   try {
+    if (refresh) await clearUserRecommendations(user.id);
     const recommendations = await recommendForUser(user, limit);
     const posts = await getPostsByIds(
       recommendations.map((item) => item.postId),

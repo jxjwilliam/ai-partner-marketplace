@@ -4,6 +4,7 @@ import ContactUnlockPanel from "@/components/ContactUnlockPanel";
 import { getSessionUser } from "@/lib/auth/session";
 import { POST_TYPE_LABEL } from "@/lib/constants";
 import {
+  getRecommendationForPost,
   getPostById,
   getUnlockStatus,
   incrementPostViews,
@@ -67,8 +68,14 @@ export default async function PostDetailPage({
 
   const viewCount = await incrementPostViews(post.id);
   let unlockStatus: "pending" | "approved" | "rejected" | null = null;
+  let recommendationReason: string | null = null;
   if (viewer && viewer.id !== post.authorId) {
     unlockStatus = await getUnlockStatus(post.id, viewer.id);
+    const recommendation = await getRecommendationForPost(
+      viewer.id,
+      post.id,
+    ).catch(() => null);
+    recommendationReason = recommendation?.reason ?? null;
   }
   const revealContact = shouldRevealContact({
     viewerId: viewer?.id ?? null,
@@ -91,6 +98,12 @@ export default async function PostDetailPage({
       <Link className="text-sm text-slate-500 hover:text-cyan-600" href="/">
         ← 返回集市
       </Link>
+
+      {recommendationReason && (
+        <p className="mt-4 rounded-2xl border border-cyan-100 bg-cyan-50 p-4 text-sm leading-6 text-cyan-800">
+          ✨ AI 认为这条适合你：{recommendationReason}
+        </p>
+      )}
 
       <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
         <article className="border border-slate-200 bg-white">
