@@ -126,6 +126,7 @@ docs/              # Specs, plans, research, deploy guide
 | Doc | What |
 |-----|------|
 | [AGENTS.md](./AGENTS.md) | Guidance for coding agents |
+| [Merged features](./docs/codex_merged_features.md) | 双项目合并说明（功能对照与取舍） |
 | [Design spec](./docs/superpowers/specs/2026-07-21-ai-partner-marketplace-design.md) | Product decisions (source of truth) |
 | [Aliyun deploy](./docs/deploy-aliyun.md) | ECS/Nginx/PM2 + Supabase 迁移 |
 | `docs/kimi-*.md`, `docs/doubao-*.md`, … | Research / earlier PRD drafts |
