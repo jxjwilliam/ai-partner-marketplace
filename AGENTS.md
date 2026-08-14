@@ -21,13 +21,27 @@ That design **overrides** older drafts under `docs/` (Kimi PRD, Doubao/DeepSeek 
 5. **LLM polish:** never send phone/contact into prompts; sanitize keys *and* values; polish failure must not block publish (`润色暂不可用`).
 6. **v1 out of scope:** comments, DMs, Elasticsearch, payments, mini-program, App, WeChat KYC. Do not add them “while you’re here.”
 
+### Iframe-safe auth (2026-08)
+
+The dashboard embeds this app in a cross-origin iframe where third-party cookies are blocked,
+so login must not depend on the httpOnly cookie:
+
+- `POST /api/auth/verify-otp` returns the session **token** in the response; the client
+  persists it in `localStorage` under `aim_session_token` (`src/lib/auth/client-session.ts`).
+- Client calls go through `apiFetch()`, which attaches `Authorization: Bearer <token>`;
+  server-side `getSessionUser(request)` reads that header first and falls back to the cookie
+  for direct browsing (`src/lib/auth/session.ts`).
+- Gated pages (`/posts/new`, `/me`, `/recommendations`) and the unlock panel resolve auth
+  client-side; `GET /api/posts/[id]/unlock` and `GET /api/me/dashboard` serve the iframe
+  path. Keep new authed UI on this pattern — never route iframe auth through cookies only.
+
 ## Architecture map
 
 | Area | Location | Notes |
 |------|----------|--------|
 | Routes / API | `src/app/` | App Router; Route Handlers under `src/app/api/` |
 | UI | `src/components/` | Keep pages thin; logic in lib where testable |
-| Auth | `src/lib/auth/` | OTP helpers, session cookie, SMS adapter |
+| Auth | `src/lib/auth/` | OTP helpers, session tokens, SMS adapter — **iframe-safe since 2026-08** |
 | Posts | `src/lib/posts/` | Zod `parsePostInput`, `buildPostWhere`（搜索/排序/分页）, visibility |
 | Unlock | `src/lib/unlock/` | `canCreateUnlockRequest`, `nextUnlockStatus` |
 | AI | `src/lib/ai/` | `polish.ts` 润色；`match.ts` 推荐（规则评分 + LLM 理由 + 缓存，30 分钟 TTL） |

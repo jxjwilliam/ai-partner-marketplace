@@ -1,6 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import {
+  apiFetch,
+  getClientToken,
+  setClientToken,
+} from "@/lib/auth/client-session";
 
 type ApiResponse = {
   ok?: boolean;
@@ -8,6 +13,7 @@ type ApiResponse = {
   needsOnboarding?: boolean;
   dryRun?: boolean;
   devCode?: string;
+  token?: string;
 };
 
 async function readResponse(response: Response): Promise<ApiResponse> {
@@ -26,6 +32,26 @@ export default function LoginPage() {
   const [hint, setHint] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Already signed in (iframe localStorage session)? Skip the form.
+  useEffect(() => {
+    if (!getClientToken()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch("/api/me");
+        if (cancelled || !res.ok) return;
+        const next =
+          new URLSearchParams(window.location.search).get("next") || "/";
+        window.location.replace(next);
+      } catch {
+        // keep showing the form
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function sendOtp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -33,7 +59,7 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      const response = await fetch("/api/auth/send-otp", {
+      const response = await apiFetch("/api/auth/send-otp", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ phone }),
@@ -61,7 +87,7 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      const response = await fetch("/api/auth/verify-otp", {
+      const response = await apiFetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ phone, code }),
@@ -70,6 +96,9 @@ export default function LoginPage() {
       if (!response.ok || !result.ok) {
         setError(result.error ?? "登录失败，请稍后重试");
         return;
+      }
+      if (result.token) {
+        setClientToken(result.token);
       }
       window.location.assign(result.needsOnboarding ? "/onboarding" : "/");
     } catch {

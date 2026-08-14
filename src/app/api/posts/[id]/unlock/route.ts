@@ -7,6 +7,8 @@ import {
   getUnlockStatus,
   reopenUnlockRequest,
 } from "@/lib/data";
+import { getPostById } from "@/lib/data";
+import { shouldRevealContact } from "@/lib/posts/visibility";
 import { canCreateUnlockRequest } from "@/lib/unlock/state";
 
 type RouteContext = {
@@ -18,7 +20,7 @@ function error(message: string, status: number) {
 }
 
 export async function POST(req: NextRequest, context: RouteContext) {
-  const user = await getSessionUser();
+  const user = await getSessionUser(req);
   if (!user) return error("请先登录", 401);
 
   const { id: postId } = await context.params;
@@ -61,5 +63,36 @@ export async function POST(req: NextRequest, context: RouteContext) {
   return NextResponse.json({
     ok: true,
     request: { id: request.id, status: request.status },
+  });
+}
+
+/**
+ * Client-side auth state for the unlock panel (used by the iframe dashboard:
+ * the browser sends `Authorization: Bearer <localStorage token>`).
+ */
+export async function GET(req: NextRequest, context: RouteContext) {
+  const user = await getSessionUser(req);
+  const { id: postId } = await context.params;
+  const post = await getPostById(postId);
+  if (!post) return error("信息不存在", 404);
+
+  const unlockStatus =
+    user && user.id !== post.authorId
+      ? await getUnlockStatus(postId, user.id)
+      : null;
+  const contact = shouldRevealContact({
+    viewerId: user?.id ?? null,
+    authorId: post.authorId,
+    unlockStatus,
+  })
+    ? post.contactPrivate
+    : undefined;
+
+  return NextResponse.json({
+    ok: true,
+    loggedIn: Boolean(user),
+    isAuthor: user?.id === post.authorId,
+    status: unlockStatus,
+    contact,
   });
 }

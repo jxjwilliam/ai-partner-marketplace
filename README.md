@@ -28,7 +28,7 @@
 | App | Next.js 15 (App Router) + React 19 + TypeScript |
 | UI | Tailwind CSS 4 |
 | DB | **Supabase 托管 PostgreSQL** + supabase-js（service_role，REST，表统一 `sf_` 前缀） |
-| Auth | Phone OTP + httpOnly session cookie |
+| Auth | Phone OTP；session token 存 **localStorage**，API 走 `Authorization: Bearer`（httpOnly cookie 仅作直连兜底，iframe 安全） |
 | SMS | 阿里云短信（Dysmsapi） |
 | LLM | OpenAI-compatible API（当前 DeepSeek） |
 | Deploy | 阿里云 ECS/轻量 + Supabase（见 [deploy-aliyun.md](./docs/deploy-aliyun.md)） |
@@ -52,7 +52,7 @@ npm run seed                # 写入演示账号与帖子（幂等）
 npm run dev
 ```
 
-打开 [http://localhost:3000](http://localhost:3000)。`SMS_DRY_RUN=true` 时验证码打印在服务端日志中。
+打开 [http://localhost:5600](http://localhost:5600)（平台端口方案：Step 6 → 56xx，见 `../platform/ports.config.json`）。`SMS_DRY_RUN=true` 时验证码打印在服务端日志中。
 
 > 表结构（`sf_*`）与迁移 SQL 位于 `supabase/migrations/`，已通过 Supabase CLI 应用到
 > `yggdfseoswfblvjewaov` 项目。改表后执行：

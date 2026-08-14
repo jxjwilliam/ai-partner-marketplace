@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 import type { User } from "@/lib/types";
 import {
   createSessionRow,
@@ -33,20 +34,40 @@ export async function clearSessionCookie(): Promise<void> {
   jar.delete(SESSION_COOKIE);
 }
 
-export async function getSessionUser(): Promise<User | null> {
-  const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
+function bearerToken(request?: NextRequest): string | null {
+  const header = request?.headers.get("authorization");
+  if (!header || !header.startsWith("Bearer ")) return null;
+  const token = header.slice("Bearer ".length).trim();
+  return token || null;
+}
+
+export async function resolveSessionToken(token: string): Promise<User | null> {
   if (!token) return null;
   const found = await findSessionUser(hashToken(token));
   if (!found || found.session.expiresAt < new Date()) return null;
   return found.user;
 }
 
-export async function destroySession(): Promise<void> {
+/**
+ * Resolve the current user. API routes pass their `NextRequest` so the
+ * `Authorization: Bearer <token>` header is honored first — that's how
+ * localStorage-backed sessions survive cross-origin iframe embedding (third
+ * party cookies are blocked there). The httpOnly cookie remains the fallback
+ * for SSR / direct browsing.
+ */
+export async function getSessionUser(
+  request?: NextRequest,
+): Promise<User | null> {
   const jar = await cookies();
-  const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) {
-    await deleteSessionRows(hashToken(token));
+  const token = bearerToken(request) ?? jar.get(SESSION_COOKIE)?.value ?? null;
+  return token ? resolveSessionToken(token) : null;
+}
+
+export async function destroySession(token?: string | null): Promise<void> {
+  const jar = await cookies();
+  const target = token ?? jar.get(SESSION_COOKIE)?.value ?? null;
+  if (target) {
+    await deleteSessionRows(hashToken(target));
   }
   await clearSessionCookie();
 }

@@ -12,7 +12,7 @@ function error(message: string, status: number) {
 }
 
 export async function POST(req: NextRequest, context: RouteContext) {
-  const user = await getSessionUser();
+  const user = await getSessionUser(req);
   if (!user) return error("请先登录", 401);
 
   let action: "approve" | "reject";

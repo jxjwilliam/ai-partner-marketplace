@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { apiFetch } from "@/lib/auth/client-session";
 
 type PostItem = {
   id: string;
@@ -61,7 +62,7 @@ export default function MeDashboard({
     setBusy(key);
     setError("");
     try {
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method: url.startsWith("/api/unlock/") ? "POST" : "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),

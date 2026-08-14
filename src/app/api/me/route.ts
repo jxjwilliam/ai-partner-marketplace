@@ -21,8 +21,8 @@ function safeUser(user: User) {
   };
 }
 
-export async function GET() {
-  const user = await getSessionUser();
+export async function GET(request: NextRequest) {
+  const user = await getSessionUser(request);
   if (!user) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
@@ -30,7 +30,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  const user = await getSessionUser();
+  const user = await getSessionUser(req);
   if (!user) {
     return NextResponse.json(
       { ok: false, error: "请先登录" },

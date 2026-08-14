@@ -1,15 +1,16 @@
+"use client";
+
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import RefreshRecommendations from "@/components/RefreshRecommendations";
-import { getSessionUser } from "@/lib/auth/session";
-import { recommendForUser } from "@/lib/ai/match";
-import { getPostsByIds } from "@/lib/data";
+import {
+  apiFetch,
+  clearClientToken,
+  getClientToken,
+} from "@/lib/auth/client-session";
 import { POST_TYPE_LABEL } from "@/lib/constants";
 import type { PostType } from "@/lib/types";
-
-export const metadata = {
-  title: "AI 为你推荐 - AI合伙人集市",
-};
 
 type RecommendationCard = {
   post: {
@@ -22,27 +23,39 @@ type RecommendationCard = {
   reason: string;
 };
 
-export default async function RecommendationsPage() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login?next=/recommendations");
+export default function RecommendationsPage() {
+  const router = useRouter();
+  const [items, setItems] = useState<RecommendationCard[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  let items: RecommendationCard[] = [];
-  try {
-    const recommendations = await recommendForUser(user, 6);
-    const posts = await getPostsByIds(
-      recommendations.map((item) => item.postId),
-    );
-    const byId = new Map(posts.map((post) => [post.id, post]));
-    items = recommendations
-      .map((item) => ({
-        post: byId.get(item.postId) ?? null,
-        score: item.score,
-        reason: item.reason,
-      }))
-      .filter((item) => item.post !== null);
-  } catch {
-    items = [];
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!getClientToken()) {
+        router.replace("/login?next=/recommendations");
+        return;
+      }
+      const refresh =
+        new URLSearchParams(window.location.search).get("refresh") === "1";
+      const res = await apiFetch(
+        `/api/recommendations?limit=5${refresh ? "&refresh=1" : ""}`,
+      );
+      if (cancelled) return;
+      if (!res.ok) {
+        clearClientToken();
+        router.replace("/login?next=/recommendations");
+        return;
+      }
+      const body = (await res.json()) as {
+        recommendations?: RecommendationCard[];
+      };
+      setItems(body.recommendations ?? []);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
@@ -60,7 +73,11 @@ export default async function RecommendationsPage() {
       </div>
 
       <section className="mt-6 space-y-3">
-        {items.length ? (
+        {loading ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">
+            加载中…
+          </div>
+        ) : items.length ? (
           items.map((item, index) =>
             item.post ? (
               <Link

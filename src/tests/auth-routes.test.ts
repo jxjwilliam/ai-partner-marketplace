@@ -219,6 +219,7 @@ describe("POST /api/auth/verify-otp", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       ok: true,
+      token: expect.any(String),
       needsOnboarding: true,
     });
     expect(mocks.consumeOtpRow).toHaveBeenCalledWith("otp-1");
@@ -260,6 +261,7 @@ describe("POST /api/auth/verify-otp", () => {
 
     await expect(response.json()).resolves.toEqual({
       ok: true,
+      token: expect.any(String),
       needsOnboarding: false,
     });
     expect(mocks.createUser).not.toHaveBeenCalled();
@@ -315,7 +317,7 @@ describe("POST /api/auth/verify-otp", () => {
 
 describe("POST /api/auth/logout", () => {
   it("destroys the session", async () => {
-    const response = await logout();
+    const response = await logout(jsonRequest("/api/auth/logout", {}));
 
     expect(response.status).toBe(200);
     expect(mocks.destroySession).toHaveBeenCalledOnce();

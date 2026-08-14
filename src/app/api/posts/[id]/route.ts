@@ -22,7 +22,7 @@ function notFound() {
 
 export async function GET(_req: NextRequest, context: RouteContext) {
   const { id } = await context.params;
-  const viewer = await getSessionUser();
+  const viewer = await getSessionUser(_req);
   const post = await getPostById(id);
 
   if (
@@ -57,7 +57,7 @@ export async function GET(_req: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(req: NextRequest, context: RouteContext) {
-  const user = await getSessionUser();
+  const user = await getSessionUser(req);
   if (!user) {
     return NextResponse.json(
       { ok: false, error: "请先登录" },

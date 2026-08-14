@@ -4,7 +4,7 @@ import { clearUserRecommendations, getPostsByIds } from "@/lib/data";
 import { recommendForUser } from "@/lib/ai/match";
 
 export async function GET(req: NextRequest) {
-  const user = await getSessionUser();
+  const user = await getSessionUser(req);
   if (!user) {
     return NextResponse.json(
       { ok: false, error: "请先登录" },

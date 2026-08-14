@@ -24,7 +24,7 @@ describe("登录与入驻界面", () => {
     expect(page).toContain("我有项目");
     expect(page).toContain("我是投资人");
     expect(page).toContain("其他");
-    expect(page).toContain('fetch("/api/me"');
+    expect(page).toContain('apiFetch("/api/me"');
   });
 });
 

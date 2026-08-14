@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import AiPolishBlock from "@/components/AiPolishBlock";
 import { FILTER_CITIES, POST_TYPE_LABEL, TAGS } from "@/lib/constants";
+import { apiFetch } from "@/lib/auth/client-session";
 
 type PostType = "partner" | "talent" | "project" | "funding";
 type Values = Record<string, string>;
@@ -149,7 +150,7 @@ export default function PostForm({ defaultCity = "" }: { defaultCity?: string })
     setError("");
     setSubmitting(true);
     try {
-      const response = await fetch("/api/posts", {
+      const response = await apiFetch("/api/posts", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

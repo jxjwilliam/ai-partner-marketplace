@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { apiFetch } from "@/lib/auth/client-session";
 
 type Props = {
   type: string;
@@ -18,7 +19,7 @@ export default function AiPolishBlock({ type, fields, onAdopt }: Props) {
     setError("");
     setPolished(null);
     try {
-      const response = await fetch("/api/ai/polish", {
+      const response = await apiFetch("/api/ai/polish", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ type, fields }),

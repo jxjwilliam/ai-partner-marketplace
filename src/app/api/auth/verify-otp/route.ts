@@ -101,5 +101,7 @@ export async function POST(request: NextRequest) {
   await setSessionCookie(token);
 
   const needsOnboarding = !user.nickname || !user.city || !user.roleTag;
-  return NextResponse.json({ ok: true, needsOnboarding });
+  // Token is returned so clients can persist it in localStorage
+  // (iframe-safe; the httpOnly cookie is still set for direct browsing).
+  return NextResponse.json({ ok: true, token, needsOnboarding });
 }

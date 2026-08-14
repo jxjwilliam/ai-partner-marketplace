@@ -10,9 +10,10 @@ describe("发布信息界面", () => {
   it("redirects anonymous visitors to login and renders the form for users", () => {
     const page = source("src/app/posts/new/page.tsx");
 
-    expect(page).toContain('redirect("/login?next=/posts/new")');
+    expect(page).toContain('router.replace("/login?next=/posts/new")');
     expect(page).toContain("<PostForm");
-    expect(page).toContain("getSessionUser");
+    expect(page).toContain("getClientToken");
+    expect(page).toContain("apiFetch");
   });
 
   it("implements the Chinese three-step publish flow", () => {
@@ -24,7 +25,7 @@ describe("发布信息界面", () => {
     expect(form).toContain("POST_TYPE_LABEL");
     expect(form).toContain("FILTER_CITIES");
     expect(form).toContain("TAGS");
-    expect(form).toContain('fetch("/api/posts"');
+    expect(form).toContain('apiFetch("/api/posts"');
     expect(form).toContain('window.location.assign(`/posts/${result.id}`)');
   });
 
@@ -35,7 +36,7 @@ describe("发布信息界面", () => {
     expect(form).toContain('import AiPolishBlock from "@/components/AiPolishBlock"');
     expect(form).toContain("<AiPolishBlock");
     expect(form).toContain("onAdopt=");
-    expect(polish).toContain('fetch("/api/ai/polish"');
+    expect(polish).toContain('apiFetch("/api/ai/polish"');
     expect(polish).toContain("一键润色");
     expect(polish).toContain("采用");
     expect(polish).toContain("放弃");

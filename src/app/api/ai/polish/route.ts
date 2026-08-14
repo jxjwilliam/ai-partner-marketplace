@@ -12,7 +12,7 @@ function isStringRecord(value: unknown): value is Record<string, string> {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getSessionUser();
+  const user = await getSessionUser(request);
   if (!user) {
     return NextResponse.json(
       { ok: false, error: "请先登录" },

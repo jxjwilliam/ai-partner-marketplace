@@ -67,11 +67,13 @@ describe("个人中心", () => {
   it("renders profile, posts, incoming decisions, and outgoing statuses", () => {
     const page = source("src/app/me/page.tsx");
     const dashboard = source("src/components/MeDashboard.tsx");
+    const api = source("src/app/api/me/dashboard/route.ts");
 
-    expect(page).toContain("getSessionUser");
-    expect(page).toContain('redirect("/login?next=/me")');
-    expect(page).toContain("shouldRevealContact");
-    expect(page).toContain("contact: reveal ? item.post!.contactPrivate : undefined");
+    expect(page).toContain('router.replace("/login?next=/me")');
+    expect(page).toContain("/api/me/dashboard");
+    expect(page).toContain("getClientToken");
+    expect(api).toContain("shouldRevealContact");
+    expect(api).toContain("contact: reveal ? item.post!.contactPrivate : undefined");
     expect(dashboard).toContain("我的帖子");
     expect(dashboard).toContain("联系方式申请");
     expect(dashboard).toContain("/api/unlock/");

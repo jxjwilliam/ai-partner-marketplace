@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { FILTER_CITIES } from "@/lib/constants";
+import { apiFetch } from "@/lib/auth/client-session";
 
 const ROLE_OPTIONS = [
   { value: "talent", label: "我是技术人" },
@@ -38,7 +39,7 @@ export default function OnboardingPage() {
     setSubmitting(true);
 
     try {
-      const response = await fetch("/api/me", {
+      const response = await apiFetch("/api/me", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

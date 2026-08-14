@@ -1,70 +1,81 @@
-import { redirect } from "next/navigation";
-import MeDashboard from "@/components/MeDashboard";
-import { getSessionUser } from "@/lib/auth/session";
-import {
-  listIncomingUnlocks,
-  listMyPosts,
-  listOutgoingUnlocks,
-} from "@/lib/data";
-import { shouldRevealContact } from "@/lib/posts/visibility";
+"use client";
 
-const ROLE_LABELS: Record<string, string> = {
-  talent: "技术人才",
-  founder: "项目方",
-  investor: "投资人",
-  other: "其他",
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import MeDashboard from "@/components/MeDashboard";
+import {
+  apiFetch,
+  clearClientToken,
+  getClientToken,
+} from "@/lib/auth/client-session";
+
+type DashboardData = {
+  profile: {
+    nickname: string;
+    phone: string;
+    city: string;
+    role: string;
+    bio: string;
+    skills: string[];
+    yearsExperience: number | null;
+  };
+  posts: Array<{
+    id: string;
+    title: string;
+    status: "active" | "hidden";
+    bumpedAt: string;
+  }>;
+  incoming: Array<{
+    id: string;
+    message: string;
+    createdAt: string;
+    requesterName: string;
+    postTitle: string;
+  }>;
+  outgoing: Array<{
+    id: string;
+    status: "pending" | "approved" | "rejected";
+    createdAt: string;
+    postId: string;
+    postTitle: string;
+    authorName: string;
+    contact?: string;
+  }>;
 };
 
-export default async function MePage() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login?next=/me");
+export default function MePage() {
+  const router = useRouter();
+  const [data, setData] = useState<DashboardData | null>(null);
 
-  const [posts, incoming, outgoing] = await Promise.all([
-    listMyPosts(user.id),
-    listIncomingUnlocks(user.id),
-    listOutgoingUnlocks(user.id),
-  ]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!getClientToken()) {
+        router.replace("/login?next=/me");
+        return;
+      }
+      const res = await apiFetch("/api/me/dashboard");
+      if (cancelled) return;
+      if (!res.ok) {
+        clearClientToken();
+        router.replace("/login?next=/me");
+        return;
+      }
+      const body = (await res.json()) as { data?: DashboardData };
+      setData(body.data ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
-  return (
-    <MeDashboard
-      profile={{
-        nickname: user.nickname,
-        phone: user.phone,
-        city: user.city,
-        role: user.roleTag ? ROLE_LABELS[user.roleTag] : "身份待完善",
-        bio: user.bio,
-        skills: user.skills,
-        yearsExperience: user.yearsExperience,
-      }}
-      posts={posts.map((post) => ({
-        ...post,
-        bumpedAt: post.bumpedAt.toISOString(),
-      }))}
-      incoming={incoming.map((item) => ({
-        id: item.id,
-        message: item.message,
-        createdAt: item.createdAt.toISOString(),
-        requesterName: item.requesterName ?? "集市用户",
-        postTitle: item.postTitle,
-      }))}
-      outgoing={outgoing.map((item) => {
-        const reveal =
-          item.post &&
-          shouldRevealContact({
-            viewerId: user.id,
-            authorId: item.post.authorId,
-            unlockStatus: item.status,
-          });
-        return {
-          id: item.id,
-          status: item.status,
-          createdAt: item.createdAt.toISOString(),
-          postId: item.post?.id ?? "",
-          postTitle: item.post?.title ?? "",
-          authorName: item.post?.authorName ?? "集市用户",
-          contact: reveal ? item.post!.contactPrivate : undefined,
-        };
-      })}
-    />
-  );
+  if (!data) {
+    return (
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-16">
+        <p className="text-center text-sm text-slate-500">加载中…</p>
+      </main>
+    );
+  }
+
+  return <MeDashboard {...data} />;
 }

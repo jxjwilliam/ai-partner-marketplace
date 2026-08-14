@@ -1,17 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { UNLOCK_MIN_MESSAGE_LEN } from "@/lib/constants";
+import { apiFetch } from "@/lib/auth/client-session";
 
 type UnlockStatus = "pending" | "approved" | "rejected" | null;
 
 export default function ContactUnlockPanel({
   postId,
-  loggedIn,
-  isAuthor,
+  loggedIn: loggedInInitial,
+  isAuthor: isAuthorInitial,
   initialStatus,
-  contact,
+  contact: contactInitial,
 }: {
   postId: string;
   loggedIn: boolean;
@@ -20,16 +21,49 @@ export default function ContactUnlockPanel({
   contact?: string;
 }) {
   const [status, setStatus] = useState(initialStatus);
+  const [loggedIn, setLoggedIn] = useState(loggedInInitial);
+  const [isAuthor, setIsAuthor] = useState(isAuthorInitial);
+  const [contact, setContact] = useState(contactInitial);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // The panel is SSR'd with cookie-based state (direct browsing). Inside the
+  // dashboard iframe cookies are blocked, so re-resolve the viewer via the
+  // Authorization header after mount.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch(`/api/posts/${postId}/unlock`);
+        if (cancelled || !res.ok) return;
+        const data = (await res.json()) as {
+          ok?: boolean;
+          loggedIn?: boolean;
+          isAuthor?: boolean;
+          status?: UnlockStatus;
+          contact?: string;
+        };
+        if (!data.ok) return;
+        if (typeof data.loggedIn === "boolean") setLoggedIn(data.loggedIn);
+        if (typeof data.isAuthor === "boolean") setIsAuthor(data.isAuthor);
+        if (typeof data.status === "string") setStatus(data.status);
+        if (typeof data.contact === "string") setContact(data.contact);
+      } catch {
+        // keep SSR defaults
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [postId]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setSubmitting(true);
     try {
-      const response = await fetch(`/api/posts/${postId}/unlock`, {
+      const response = await apiFetch(`/api/posts/${postId}/unlock`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ message }),

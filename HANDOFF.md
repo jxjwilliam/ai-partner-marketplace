@@ -1,0 +1,4 @@
+- jsonl transcript
+- git diff, git commit list
+- TODO
+- spec/plan
