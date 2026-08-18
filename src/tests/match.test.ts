@@ -245,4 +245,30 @@ describe("recommendForUser", () => {
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(signal.aborted).toBe(true);
   });
+
+  it("returns rule-based reasons instantly and skips the LLM when skipLlm is set", async () => {
+    dataMocks.listPostsForMatching.mockResolvedValue([
+      {
+        id: "post-1",
+        authorId: "other",
+        type: "partner",
+        title: "找全栈合伙人",
+        city: "上海",
+        tags: ["全栈", "AI大模型"],
+        bodyJson: {},
+      },
+    ]);
+    const fetchMock = vi.fn(async () => {
+      throw new Error("LLM must not be called on the homepage path");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const items = await recommendForUser(user, 1, { skipLlm: true });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(dataMocks.upsertRecommendations).not.toHaveBeenCalled();
+    expect(items).toEqual([
+      { postId: "post-1", score: expect.any(Number), reason: expect.any(String) },
+    ]);
+  });
 });

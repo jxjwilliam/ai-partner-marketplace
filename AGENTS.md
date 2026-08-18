@@ -47,7 +47,7 @@ so login must not depend on the httpOnly cookie:
 | Auth | `src/lib/auth/` | Phone OTP helpers + Supabase Auth email magic link / Google OAuth (`/api/auth/supabase-session` 用 service_role 校验 access token; Google 走弹窗 `skipBrowserRedirect`), session tokens, SMS adapter — **iframe-safe since 2026-08** |
 | Posts | `src/lib/posts/` | Zod `parsePostInput`, `buildPostWhere`（搜索/排序/分页）, visibility |
 | Unlock | `src/lib/unlock/` | `canCreateUnlockRequest`, `nextUnlockStatus` |
-| AI | `src/lib/ai/` | `polish.ts` 润色；`match.ts` 推荐（规则评分 + LLM 理由 + 缓存，30 分钟 TTL） |
+| AI | `src/lib/ai/` | `polish.ts` 润色；`match.ts` 推荐（规则评分 + LLM 理由 + 缓存，30 分钟 TTL；首页 `skipLlm` 即时出规则结果，LLM 理由只在 `/recommendations` 生成） |
 | Data | `src/lib/data.ts` | 全部数据库访问集中于此（supabase-js + service_role，`sf_` 前缀表），路由不直接拼 REST |
 | Schema | `supabase/migrations/` | Supabase 托管 Postgres；表统一 `sf_` 前缀，迁移 SQL 由 CLI `db query --linked` 执行 |
 | Tests | `src/tests/` | Vitest; prefer unit + mocked `@/lib/data` route tests |

@@ -195,7 +195,7 @@ export type RecommendationItem = {
 export async function recommendForUser(
   user: User,
   limit: number,
-  options?: { llmTimeoutMs?: number },
+  options?: { llmTimeoutMs?: number; skipLlm?: boolean },
 ): Promise<RecommendationItem[]> {
   const since = new Date(Date.now() - CACHE_TTL_MS);
   const cached = await getCachedRecommendations(user.id, since);
@@ -210,6 +210,19 @@ export async function recommendForUser(
     .slice(0, 6);
 
   if (scored.length === 0) return [];
+
+  if (options?.skipLlm) {
+    // 首页等 SSR 路径：只出规则结果，不等待 LLM、不写缓存。
+    // 缓存里有 LLM 理由时直接命中（上面的 cache 分支），否则先用规则文案
+    // 即时渲染；LLM 理由由 /recommendations 生成并写入 30 分钟缓存。
+    return scored
+      .map((item) => ({
+        postId: item.post.id,
+        score: item.detail.score,
+        reason: fallbackReason(item.detail),
+      }))
+      .slice(0, limit);
+  }
 
   const llmReasons = await generateMatchReasons(
     user,
