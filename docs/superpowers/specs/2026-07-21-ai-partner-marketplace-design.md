@@ -47,7 +47,7 @@ Ship a China-mainland web MVP: a Craigslist-style information board where **35+/
 |-------|----------|
 | Product shape | Full web MVP (not community-only first) |
 | Feature cut | P0 + thin P1: contact unlock + AI polish |
-| Auth | Mainland phone OTP (阿里云短信服务) |
+| Auth | Mainland phone OTP (阿里云短信服务) + 邮箱魔法链接 + Google OAuth（Supabase Auth；2026-08-18 修订） |
 | Audience / geo | China mainland, Chinese UI |
 | Hosting | 阿里云 (account available): ECS/轻量 + RDS PostgreSQL + OSS optional |
 | Approach | Classic Aliyun monolith (not serverless-first, not mini-program-first) |
@@ -75,7 +75,7 @@ OSS (optional assets)   LLM API (润色 only)
 
 | Unit | Responsibility | Depends on |
 |------|----------------|------------|
-| Auth | Send/verify OTP, session, basic profile | 短信服务, `users` / `otp_codes` / `sessions` |
+| Auth | Send/verify OTP, email magic link, Google OAuth, session, basic profile | 短信服务 / Supabase Auth, `users` / `otp_codes` / `sessions` |
 | Posts | CRUD four templates; list/filter | `posts` |
 | Unlock | Request → approve/reject → reveal contact | `contact_requests`, Auth |
 | AI polish | Rewrite draft fields; user adopts or discards | LLM API (no contact/phone in prompts) |
@@ -100,7 +100,7 @@ OSS (optional assets)   LLM API (润色 only)
 | `/posts/new` | Type → template form (+ AI polish) → preview/publish |
 | `/posts/[id]` | Detail, publisher card, contact unlock CTA |
 | `/me` | Profile basics, my posts, unlock requests (in/out) |
-| `/login` | Phone + OTP |
+| `/login` | Phone + OTP / 邮箱魔法链接 / Google 登录 |
 
 ### 4.2 UI building blocks
 
@@ -161,7 +161,7 @@ Align with Kimi PRD templates; store extras in JSON:
 
 ## 6. Flows
 
-1. **Login:** phone → SMS OTP → verify → httpOnly session → optional onboarding (nickname, city, role)
+1. **Login:** phone → SMS OTP → verify → session；邮箱 → 魔法链接 → 回调 → session；或 Google → OAuth 弹窗 → 回调 → session → optional onboarding (nickname, city, role)
 2. **Publish:** auth → pick type → fill template → optional AI polish → submit → `/posts/[id]`
 3. **Browse:** public; filters city + type + tags (AND); sort by `bumped_at` / `created_at` desc
 4. **Unlock:** intro message → pending → author decide on `/me` → approve reveals contact on detail; reject does not

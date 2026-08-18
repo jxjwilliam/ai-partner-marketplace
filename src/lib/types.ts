@@ -5,7 +5,9 @@ export type UnlockStatus = "pending" | "approved" | "rejected";
 
 export type User = {
   id: string;
-  phone: string;
+  phone: string | null;
+  authUserId: string | null;
+  email: string | null;
   nickname: string | null;
   city: string | null;
   roleTag: RoleTag | null;

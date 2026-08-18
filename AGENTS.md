@@ -16,7 +16,9 @@ That design **overrides** older drafts under `docs/` (Kimi PRD, Doubao/DeepSeek 
 
 1. **Contact privacy:** `contactPrivate` must never appear in list APIs or public SSR payloads unless `shouldRevealContact(...)` is true (author or approved unlock requester). Prefer `select` that omits the field when only counting/updating other columns.
 2. **Chinese user-facing copy** for UI and API error strings.
-3. **Phone OTP only** for auth in v1 — no WeChat/email/OAuth login unless the design is explicitly revised.
+3. **Phone OTP + 邮箱魔法链接 + Google OAuth（Supabase Auth）** for auth — email magic link
+   and Google login were added 2026-08-18 by explicit design revision; no WeChat or other
+   providers unless the design is explicitly revised again.
 4. **SMS fail-closed:** never claim “sent” if the provider call fails; do not leave a usable OTP that was not delivered (see reservation/rollback pattern in send-otp).
 5. **LLM polish:** never send phone/contact into prompts; sanitize keys *and* values; polish failure must not block publish (`润色暂不可用`).
 6. **v1 out of scope:** comments, DMs, Elasticsearch, payments, mini-program, App, WeChat KYC. Do not add them “while you’re here.”
@@ -26,7 +28,8 @@ That design **overrides** older drafts under `docs/` (Kimi PRD, Doubao/DeepSeek 
 The dashboard embeds this app in a cross-origin iframe where third-party cookies are blocked,
 so login must not depend on the httpOnly cookie:
 
-- `POST /api/auth/verify-otp` returns the session **token** in the response; the client
+- `POST /api/auth/verify-otp` / `POST /api/auth/supabase-session` return the session **token**
+  in the response; the client
   persists it in `localStorage` under `aim_session_token` (`src/lib/auth/client-session.ts`).
 - Client calls go through `apiFetch()`, which attaches `Authorization: Bearer <token>`;
   server-side `getSessionUser(request)` reads that header first and falls back to the cookie
@@ -41,7 +44,7 @@ so login must not depend on the httpOnly cookie:
 |------|----------|--------|
 | Routes / API | `src/app/` | App Router; Route Handlers under `src/app/api/` |
 | UI | `src/components/` | Keep pages thin; logic in lib where testable |
-| Auth | `src/lib/auth/` | OTP helpers, session tokens, SMS adapter — **iframe-safe since 2026-08** |
+| Auth | `src/lib/auth/` | Phone OTP helpers + Supabase Auth email magic link / Google OAuth (`/api/auth/supabase-session` 用 service_role 校验 access token; Google 走弹窗 `skipBrowserRedirect`), session tokens, SMS adapter — **iframe-safe since 2026-08** |
 | Posts | `src/lib/posts/` | Zod `parsePostInput`, `buildPostWhere`（搜索/排序/分页）, visibility |
 | Unlock | `src/lib/unlock/` | `canCreateUnlockRequest`, `nextUnlockStatus` |
 | AI | `src/lib/ai/` | `polish.ts` 润色；`match.ts` 推荐（规则评分 + LLM 理由 + 缓存，30 分钟 TTL） |
@@ -73,6 +76,7 @@ Local SMS: `SMS_DRY_RUN=true` (codes in server logs). Do not commit `.env` / `.e
 ### Supabase 数据迁移
 
 - 表名统一 `sf_` 前缀，迁移 SQL 位于 `supabase/migrations/20260812000000_supabase_sf_prefix.sql`（已应用）。
+- `sf_users.auth_user_id`（UUID，唯一）关联 `auth.users`，邮箱登录用户以此为本地用户标识；手机号用户为 NULL。
 - 改表后把变更追加为新文件，并用 `supabase db query --linked --file <file>.sql` 执行（CLI 已登录时无需数据库密码）。
 - 新建外键若需在 REST 中嵌入，用真实表名嵌入（如 `sf_users(...)`、`sf_posts(...)`），不要用 Prisma 时代的虚拟别名。
 - service_role key 只能用于服务端，禁止下发到浏览器。

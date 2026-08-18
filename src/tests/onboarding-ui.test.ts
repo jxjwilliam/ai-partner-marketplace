@@ -16,6 +16,33 @@ describe("登录与入驻界面", () => {
     expect(page).toContain("/api/auth/verify-otp");
   });
 
+  it("offers an email magic-link tab next to the phone tab", () => {
+    const page = source("src/app/login/page.tsx");
+    const callback = source("src/app/auth/callback/page.tsx");
+    const route = source("src/app/api/auth/supabase-session/route.ts");
+
+    expect(page).toContain("手机号登录");
+    expect(page).toContain("邮箱登录");
+    expect(page).toContain("signInWithOtp");
+    expect(page).toContain("/auth/callback");
+    expect(callback).toContain("/api/auth/supabase-session");
+    expect(callback).toContain("setClientToken");
+    expect(route).toContain("supabase.auth.getUser");
+    expect(route).toContain("email_confirmed_at");
+  });
+
+  it("offers Google OAuth as a third login tab", () => {
+    const page = source("src/app/login/page.tsx");
+    const callback = source("src/app/auth/callback/page.tsx");
+
+    expect(page).toContain("Google 登录");
+    expect(page).toContain("signInWithOAuth");
+    expect(page).toContain("skipBrowserRedirect");
+    expect(page).toContain("google-oauth-popup");
+    expect(callback).toContain("window.opener");
+    expect(callback).toContain("window.close()");
+  });
+
   it("renders every required onboarding choice", () => {
     const page = source("src/app/onboarding/page.tsx");
 

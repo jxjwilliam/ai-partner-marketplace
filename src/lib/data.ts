@@ -17,7 +17,9 @@ import type {
 
 type UserRow = {
   id: string;
-  phone: string;
+  phone: string | null;
+  auth_user_id: string | null;
+  email: string | null;
   nickname: string | null;
   city: string | null;
   role_tag: RoleTag | null;
@@ -33,6 +35,8 @@ function toUser(row: UserRow): User {
   return {
     id: row.id,
     phone: row.phone,
+    authUserId: row.auth_user_id,
+    email: row.email,
     nickname: row.nickname,
     city: row.city,
     roleTag: row.role_tag,
@@ -120,6 +124,46 @@ export async function createUser(input: {
     .select("*")
     .single();
   if (error || !data) throw new Error("创建用户失败");
+  return toUser(data as UserRow);
+}
+
+export async function getUserByAuthUserId(
+  authUserId: string,
+): Promise<User | null> {
+  const { data } = await supabase
+    .from("sf_users")
+    .select("*")
+    .eq("auth_user_id", authUserId)
+    .maybeSingle();
+  return data ? toUser(data as UserRow) : null;
+}
+
+/**
+ * 邮箱登录时按 auth_user_id 查找或创建本地用户。
+ * 并发首登时用唯一索引兜底：插入冲突则回查已有行。
+ */
+export async function findOrCreateAuthUser(input: {
+  authUserId: string;
+  email: string;
+}): Promise<User> {
+  const existing = await getUserByAuthUserId(input.authUserId);
+  if (existing) return existing;
+
+  const { data, error } = await supabase
+    .from("sf_users")
+    .insert({
+      auth_user_id: input.authUserId,
+      email: input.email,
+      phone: null,
+      is_admin: false,
+    })
+    .select("*")
+    .single();
+  if (error || !data) {
+    const retry = await getUserByAuthUserId(input.authUserId);
+    if (retry) return retry;
+    throw new Error("创建用户失败");
+  }
   return toUser(data as UserRow);
 }
 

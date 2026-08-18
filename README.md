@@ -8,7 +8,7 @@
 
 ## Features
 
-- 手机号 OTP 登录（阿里云短信；本地可用 `SMS_DRY_RUN`）
+- 登录页三 tab：手机号 OTP（阿里云短信；本地可用 `SMS_DRY_RUN`）+ 邮箱魔法链接 + Google 账号登录（Supabase Auth，首次登录自动注册）
 - 四类结构化帖子：找合伙人 / 我是人才 / 接项目 / 找资金
 - 城市、类型、标签筛选 + **关键词搜索** + **最新/热度排序** + **分页加载更多**
 - 分类入口卡片（实时数量）+ 发布者「已认证」徽章
@@ -28,7 +28,7 @@
 | App | Next.js 15 (App Router) + React 19 + TypeScript |
 | UI | Tailwind CSS 4 |
 | DB | **Supabase 托管 PostgreSQL** + supabase-js（service_role，REST，表统一 `sf_` 前缀） |
-| Auth | Phone OTP；session token 存 **localStorage**，API 走 `Authorization: Bearer`（httpOnly cookie 仅作直连兜底，iframe 安全） |
+| Auth | Phone OTP + 邮箱魔法链接 + Google OAuth（Supabase Auth）；session token 存 **localStorage**，API 走 `Authorization: Bearer`（httpOnly cookie 仅作直连兜底，iframe 安全） |
 | SMS | 阿里云短信（Dysmsapi） |
 | LLM | OpenAI-compatible API（当前 DeepSeek） |
 | Deploy | 阿里云 ECS/轻量 + Supabase（见 [deploy-aliyun.md](./docs/deploy-aliyun.md)） |
@@ -53,6 +53,13 @@ npm run dev
 ```
 
 打开 [http://localhost:5600](http://localhost:5600)（平台端口方案：Step 6 → 56xx，见 `../platform/ports.config.json`）。`SMS_DRY_RUN=true` 时验证码打印在服务端日志中。
+
+> 邮箱登录需要在 Supabase Dashboard → Auth → URL Configuration 把 `http://localhost:5600/**`
+> 加入 Redirect URLs（本地开发），否则魔法链接会被 Supabase 拒绝跳转。
+
+> Google 登录：在 Supabase Dashboard → Auth → Providers → Google 填入 OAuth Client ID / Secret，
+> 并在 Google Cloud Console 的 OAuth Client（Web）里把
+> `https://yggdfseoswfblvjewaov.supabase.co/auth/v1/callback` 加入 Authorized redirect URIs。
 
 > 表结构（`sf_*`）与迁移 SQL 位于 `supabase/migrations/`，已通过 Supabase CLI 应用到
 > `yggdfseoswfblvjewaov` 项目。改表后执行：
