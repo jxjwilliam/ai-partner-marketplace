@@ -5,6 +5,7 @@ import {
   upsertRecommendations,
 } from "@/lib/data";
 import { scrubContactText } from "@/lib/ai/polish";
+import { AI_REQUEST_TIMEOUT_MS } from "@/lib/constants";
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -111,6 +112,7 @@ function extractIntro(bodyJson: Record<string, unknown>): string {
 export async function generateMatchReasons(
   user: User,
   candidates: MatchCandidate[],
+  timeoutMs: number = AI_REQUEST_TIMEOUT_MS,
 ): Promise<Record<string, string>> {
   const apiKey = process.env.OPENAI_COMPATIBLE_API_KEY;
   const baseUrl = process.env.OPENAI_COMPATIBLE_BASE_URL;
@@ -133,7 +135,7 @@ export async function generateMatchReasons(
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(timeoutMs),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
@@ -193,6 +195,7 @@ export type RecommendationItem = {
 export async function recommendForUser(
   user: User,
   limit: number,
+  options?: { llmTimeoutMs?: number },
 ): Promise<RecommendationItem[]> {
   const since = new Date(Date.now() - CACHE_TTL_MS);
   const cached = await getCachedRecommendations(user.id, since);
@@ -211,6 +214,7 @@ export async function recommendForUser(
   const llmReasons = await generateMatchReasons(
     user,
     scored.map((item) => item.post),
+    options?.llmTimeoutMs ?? AI_REQUEST_TIMEOUT_MS,
   ).catch((): Record<string, string> => ({}));
 
   const rows = scored.map((item) => ({

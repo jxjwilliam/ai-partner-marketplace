@@ -1,3 +1,5 @@
+import { AI_REQUEST_TIMEOUT_MS } from "@/lib/constants";
+
 const BLOCKED = /contact|phone|微信|手机|邮箱|email/i;
 const REDACTED = "[已隐藏]";
 
@@ -49,7 +51,7 @@ export async function polishFields(
   const safeFields = sanitizePolishFields(fields);
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
-    signal: AbortSignal.timeout(15_000),
+    signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",

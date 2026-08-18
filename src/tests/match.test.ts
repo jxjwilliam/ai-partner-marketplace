@@ -125,10 +125,47 @@ describe("generateMatchReasons", () => {
     ]);
 
     expect(reasons["post-1"]).toBe("技能匹配，值得沟通");
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     const serialized = JSON.stringify(body);
     expect(serialized).not.toContain("13800138000");
     expect(serialized).not.toContain("abc12345");
+  });
+
+  it("aborts the LLM request when the timeout budget elapses", async () => {
+    vi.stubEnv("OPENAI_COMPATIBLE_API_KEY", "test-key");
+    vi.stubEnv("OPENAI_COMPATIBLE_BASE_URL", "https://llm.example.com");
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "[]" } }],
+          }),
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const promise = generateMatchReasons(
+      user,
+      [
+        {
+          id: "post-1",
+          authorId: "other",
+          type: "partner",
+          title: "找全栈合伙人",
+          city: "上海",
+          tags: ["全栈"],
+          bodyJson: {},
+        },
+      ],
+      200,
+    );
+    const signal = fetchMock.mock.calls[0][1]?.signal as AbortSignal;
+    expect(signal).toBeInstanceOf(AbortSignal);
+
+    await promise;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(signal.aborted).toBe(true);
   });
 });
 
@@ -175,5 +212,37 @@ describe("recommendForUser", () => {
     expect(items[0].postId).toBe("post-1");
     expect(items[0].reason.length).toBeGreaterThan(0);
     expect(dataMocks.upsertRecommendations).toHaveBeenCalledTimes(1);
+  });
+
+  it("passes the caller-provided LLM timeout into the request", async () => {
+    dataMocks.listPostsForMatching.mockResolvedValue([
+      {
+        id: "post-1",
+        authorId: "other",
+        type: "partner",
+        title: "找全栈合伙人",
+        city: "上海",
+        tags: ["全栈", "AI大模型"],
+        bodyJson: {},
+      },
+    ]);
+    vi.stubEnv("OPENAI_COMPATIBLE_API_KEY", "test-key");
+    vi.stubEnv("OPENAI_COMPATIBLE_BASE_URL", "https://llm.example.com");
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "[]" } }],
+          }),
+        ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const items = await recommendForUser(user, 1, { llmTimeoutMs: 200 });
+    const signal = fetchMock.mock.calls[0][1]?.signal as AbortSignal;
+    expect(signal).toBeInstanceOf(AbortSignal);
+    expect(items.length).toBe(1);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(signal.aborted).toBe(true);
   });
 });

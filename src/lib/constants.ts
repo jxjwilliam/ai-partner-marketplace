@@ -31,3 +31,8 @@ export const OTP_MAX_SENDS_PER_IP_DAY = 20;
 export const UNLOCK_MAX_PENDING_PER_DAY = 5;
 export const UNLOCK_MIN_MESSAGE_LEN = 10;
 export const REPORT_EMAIL = "report@example.com"; // replace before launch
+
+/** AI 请求（润色 / 推荐理由）最长等待时间 */
+export const AI_REQUEST_TIMEOUT_MS = 10_000;
+/** 首页 SSR 里 AI 推荐理由的最长等待时间（避免拖慢整页渲染） */
+export const AI_HOMEPAGE_TIMEOUT_MS = 6_000;

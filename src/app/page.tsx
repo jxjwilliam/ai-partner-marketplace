@@ -8,6 +8,7 @@ import SearchBox from "@/components/SearchBox";
 import SortSelect from "@/components/SortSelect";
 import { getSessionUser } from "@/lib/auth/session";
 import { recommendForUser } from "@/lib/ai/match";
+import { AI_HOMEPAGE_TIMEOUT_MS } from "@/lib/constants";
 import { countPostsByType, getPostsByIds, listPosts } from "@/lib/data";
 import { POST_TYPE_LABEL } from "@/lib/constants";
 import {
@@ -61,7 +62,9 @@ export default async function Home({ searchParams }: HomeProps) {
   let recommendations: RecommendedItem[] = [];
   if (user) {
     try {
-      const recs = await recommendForUser(user, 3);
+      const recs = await recommendForUser(user, 3, {
+        llmTimeoutMs: AI_HOMEPAGE_TIMEOUT_MS,
+      });
       const posts = await getPostsByIds(recs.map((item) => item.postId));
       const byId = new Map(posts.map((post) => [post.id, post]));
       recommendations = recs.map((item) => ({
