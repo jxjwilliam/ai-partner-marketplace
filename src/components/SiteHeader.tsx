@@ -10,6 +10,17 @@ import {
   UserRound,
 } from "lucide-react";
 import { useSessionUser } from "@/lib/auth/use-session-user";
+import { apiFetch } from "@/lib/auth/client-session";
+
+let recommendationsPrefetched = false;
+function prefetchRecommendations() {
+  if (recommendationsPrefetched) return;
+  recommendationsPrefetched = true;
+  // 提前拉取并暖缓存（规则结果秒出），点进推荐页时直接命中。
+  void apiFetch("/api/recommendations?limit=5&page=1").catch(
+    () => undefined,
+  );
+}
 
 export default function SiteHeader() {
   const { user, loading } = useSessionUser();
@@ -86,6 +97,8 @@ export default function SiteHeader() {
                   : "text-slate-600 hover:bg-slate-100 hover:text-[#1F3A5F]"
               }`}
               href="/recommendations"
+              onMouseEnter={prefetchRecommendations}
+              onFocus={prefetchRecommendations}
             >
               <Sparkles className="h-4 w-4" aria-hidden="true" />
               推荐

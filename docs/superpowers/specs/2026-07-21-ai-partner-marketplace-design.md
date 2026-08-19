@@ -52,7 +52,7 @@ Ship a China-mainland web MVP: a Craigslist-style information board where **35+/
 | Hosting | 阿里云 (account available): ECS/轻量 + RDS PostgreSQL + OSS optional |
 | Approach | Classic Aliyun monolith (not serverless-first, not mini-program-first) |
 | Stack | Next.js 15 (App Router) + PostgreSQL + Tailwind (+ shadcn/ui as needed) |
-| LLM | Mainland-reachable API for polish only (e.g. 通义/百炼; Kimi if reachable) |
+| LLM | Mainland-reachable API for polish + 推荐理由 (e.g. 通义/百炼; 当前用 DeepSeek) |
 
 Background research and a fuller PRD live in `docs/`; this spec **overrides** the PRD where they conflict (auth, hosting, deferred P1 items).
 
@@ -68,7 +68,7 @@ Next.js 15 (App Router) on 阿里云 ECS / 轻量应用服务器
     ├── Session cookie (phone-verified users)
     ↓
 RDS PostgreSQL          短信服务 (OTP)
-OSS (optional assets)   LLM API (润色 only)
+OSS (optional assets)   LLM API (润色 + 推荐理由)
 ```
 
 ### 3.1 Units
@@ -102,6 +102,7 @@ OSS (optional assets)   LLM API (润色 only)
 | `/me` | Profile basics, my posts, unlock requests (in/out) |
 | `/login` | Phone + OTP / 邮箱魔法链接 / Google 登录 |
 | `/community` | 社区动态流：发布/评论动态（2026-08-18 修订） |
+| `/recommendations` | AI 匹配推荐：分页列表 + 后台/手动 LLM 理由生成（2026-08-19 修订） |
 
 ### 4.2 UI building blocks
 
@@ -347,3 +348,27 @@ author_id）。RLS 与既有 `sf_` 表一致：启用 RLS、无策略、仅 serv
 - 垃圾/人身攻击：MVP 靠长度 + 频率限制兜底，后续补管理员隐藏 API 与举报。
 - 内容安全（合规）：上线前建议接入机审（阿里云内容安全）扫描动态/评论；本次不实现。
 - 动态中的联系方式一律脱敏，避免“先看评论再决定要不要 unlock”破坏解锁闭环。
+
+# 修订 2026-08-19 — AI 匹配推荐（异步 LLM 升级）
+
+## 13. AI 匹配推荐（Recommendations v2）
+
+### 13.1 目标
+
+LLM 生成推荐理由不应阻塞任何页面渲染：DeepSeek 变慢/不可用时，
+首页与推荐页都即时展示规则评分结果，LLM 理由异步生成后覆盖缓存。
+
+### 13.2 行为
+
+- 首页「为你推荐」：只读 30 分钟缓存（命中 LLM 理由则直接展示），
+  未命中时用规则评分 + 规则文案即时渲染，**不等待、不调用 LLM**。
+- `/recommendations`：分页展示（每页 5 条，缓存 20 条，`RECOMMENDATIONS_PAGE_SIZE`
+  / `RECOMMENDATIONS_CACHE_SIZE`）；首屏秒出规则结果并写入缓存（`llm=false`）。
+- 异步升级：前端检测到缓存中无 AI 理由（`llmReady=false`）时，后台自动调用
+  `POST /api/recommendations/refresh` 生成 LLM 理由并覆盖缓存（`llm=true`）；
+  页面上提示「AI 理由生成中…当前展示规则匹配结果」，完成后自动刷新。
+- 手动刷新：「刷新推荐」按钮走同一接口，失败保留规则文案并提示。
+- 缓存：`sf_recommendations` 30 分钟 TTL；新增 `llm BOOLEAN NOT NULL DEFAULT false`
+  标记区分规则结果与 LLM 理由（迁移 `20260818234000_sf_recommendations_llm.sql`）；
+  upsert 时显式刷新 `created_at`，避免 TTL 停留在旧行。
+- 导航：顶栏「推荐」入口 hover/focus 时预取第一页，暖缓存。

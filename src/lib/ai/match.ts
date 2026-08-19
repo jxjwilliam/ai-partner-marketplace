@@ -9,6 +9,8 @@ import { scrubContactText } from "@/lib/ai/polish";
 import { AI_REQUEST_TIMEOUT_MS } from "@/lib/constants";
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
+export const RECOMMENDATIONS_PAGE_SIZE = 5;
+export const RECOMMENDATIONS_CACHE_SIZE = 20;
 
 const ROLE_LABEL: Record<string, string> = {
   talent: "技术人才",
@@ -305,4 +307,134 @@ export async function recommendForHome(
     score: item.detail.score,
     reason: fallbackReason(item.detail),
   }));
+}
+
+export type RecommendationPageItem = {
+  post: LightRecommendedPost | null;
+  score: number;
+  reason: string;
+};
+
+/**
+ * 推荐页快速路径（SSR/API 共用）：只读缓存或规则评分，绝不等待 LLM。
+ * - 缓存命中：按页返回（llm=true 表示已有 AI 理由）。
+ * - 缓存未命中：立即算规则结果并写入缓存（llm=false），
+ *   由前端在后台触发一次 LLM 刷新，避免首屏等待。
+ */
+export async function listRecommendationItems(
+  user: User,
+  page = 1,
+): Promise<{
+  items: RecommendationPageItem[];
+  hasMore: boolean;
+  llmReady: boolean;
+}> {
+  const since = new Date(Date.now() - CACHE_TTL_MS);
+  const cached = await getCachedRecommendations(
+    user.id,
+    since,
+    RECOMMENDATIONS_CACHE_SIZE,
+  );
+
+  if (cached.length > 0) {
+    const pageRows = cached.slice(
+      (page - 1) * RECOMMENDATIONS_PAGE_SIZE,
+      page * RECOMMENDATIONS_PAGE_SIZE,
+    );
+    const posts = await getPostsByIds(pageRows.map((item) => item.postId));
+    const byId = new Map(posts.map((post) => [post.id, post]));
+    return {
+      items: pageRows.map((item) => {
+        const post = byId.get(item.postId);
+        return {
+          post: post
+            ? {
+                id: post.id,
+                type: post.type,
+                title: post.title,
+                city: post.city,
+              }
+            : null,
+          score: item.score,
+          reason: item.reason,
+        };
+      }),
+      hasMore:
+        cached.length > page * RECOMMENDATIONS_PAGE_SIZE,
+      llmReady: cached.some((row) => row.llm),
+    };
+  }
+
+  const candidates = (await listPostsForMatching(user.id)).filter(
+    (post) => post.authorId !== user.id,
+  );
+  const scored = candidates
+    .map((post) => ({ post, detail: scorePostForUser(user, post) }))
+    .sort((a, b) => b.detail.score - a.detail.score)
+    .slice(0, RECOMMENDATIONS_CACHE_SIZE);
+
+  // 写入规则结果缓存，让下一次访问秒回；失败不影响本次渲染。
+  if (scored.length > 0) {
+    await upsertRecommendations(
+      user.id,
+      scored.map((item) => ({
+        postId: item.post.id,
+        score: item.detail.score,
+        reason: fallbackReason(item.detail),
+        llm: false,
+      })),
+    ).catch(() => undefined);
+  }
+
+  const pageRows = scored.slice(
+    (page - 1) * RECOMMENDATIONS_PAGE_SIZE,
+    page * RECOMMENDATIONS_PAGE_SIZE,
+  );
+  return {
+    items: pageRows.map((item) => ({
+      post: {
+        id: item.post.id,
+        type: item.post.type,
+        title: item.post.title,
+        city: item.post.city,
+      },
+      score: item.detail.score,
+      reason: fallbackReason(item.detail),
+    })),
+    hasMore: scored.length > page * RECOMMENDATIONS_PAGE_SIZE,
+    llmReady: false,
+  };
+}
+
+/**
+ * 重新生成推荐（用户手动刷新或前端后台触发）：规则评分 → LLM 理由 →
+ * 覆盖写入缓存（llm=true）。LLM 失败时保留规则文案。
+ */
+export async function refreshRecommendationsWithLlm(
+  user: User,
+): Promise<{ count: number }> {
+  const candidates = (await listPostsForMatching(user.id)).filter(
+    (post) => post.authorId !== user.id,
+  );
+  const scored = candidates
+    .map((post) => ({ post, detail: scorePostForUser(user, post) }))
+    .sort((a, b) => b.detail.score - a.detail.score)
+    .slice(0, RECOMMENDATIONS_CACHE_SIZE);
+  if (scored.length === 0) return { count: 0 };
+
+  const llmReasons = await generateMatchReasons(
+    user,
+    scored.map((item) => item.post),
+  ).catch((): Record<string, string> => ({}));
+
+  await upsertRecommendations(
+    user.id,
+    scored.map((item) => ({
+      postId: item.post.id,
+      score: item.detail.score,
+      reason: llmReasons[item.post.id] || fallbackReason(item.detail),
+      llm: true,
+    })),
+  );
+  return { count: scored.length };
 }

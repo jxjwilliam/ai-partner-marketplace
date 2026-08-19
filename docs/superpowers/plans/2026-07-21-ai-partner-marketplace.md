@@ -4,6 +4,7 @@
 
 > **状态：历史计划文档（2026-07-21）。** 实际实现已偏离本文部分条目：数据库为
 > Supabase 托管 PostgreSQL + supabase-js（非 Prisma）；登录已新增邮箱魔法链接与 Google OAuth；
+> AI 匹配推荐已上线（首页/推荐页首屏秒出规则结果，LLM 理由异步生成）；
 > 评论/社区动态已按 2026-08-18 设计修订（见
 > `docs/superpowers/specs/2026-07-21-ai-partner-marketplace-design.md` 文末修订节）纳入 v1.1。
 > 后续以设计文档最新修订与代码为准。
@@ -17,7 +18,7 @@
 ## Global Constraints
 
 - Chinese UI copy only for user-facing strings
-- Phone OTP auth only (no WeChat / email login in v1)
+- Phone OTP + 邮箱魔法链接 + Google OAuth（Supabase Auth）
 - Contact always gated until author approves unlock
 - Never send phone or `contact_private` into LLM prompts
 - Public reads only `posts.status = active`

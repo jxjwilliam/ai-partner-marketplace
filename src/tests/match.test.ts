@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fallbackReason,
   generateMatchReasons,
+  listRecommendationItems,
   recommendForHome,
   recommendForUser,
+  refreshRecommendationsWithLlm,
   scorePostForUser,
 } from "@/lib/ai/match";
 import type { User } from "@/lib/types";
@@ -347,5 +349,136 @@ describe("recommendForHome", () => {
       },
     ]);
     expect(dataMocks.getPostsByIds).toHaveBeenCalledWith(["post-1"]);
+  });
+});
+
+describe("listRecommendationItems", () => {
+  it("returns cached pages instantly and marks LLM reasons ready", async () => {
+    dataMocks.getCachedRecommendations.mockResolvedValue([
+      { postId: "post-1", score: 9, reason: "缓存 AI 理由", llm: true },
+    ]);
+    dataMocks.getPostsByIds.mockResolvedValue([
+      {
+        id: "post-1",
+        type: "partner",
+        title: "找全栈合伙人",
+        city: "上海",
+        tags: [],
+        bodyJson: {},
+        viewCount: 1,
+        createdAt: new Date(),
+        bumpedAt: new Date(),
+        author: null,
+      },
+    ]);
+
+    const result = await listRecommendationItems(user, 1);
+
+    expect(result.llmReady).toBe(true);
+    expect(result.items[0]).toEqual({
+      post: { id: "post-1", type: "partner", title: "找全栈合伙人", city: "上海" },
+      score: 9,
+      reason: "缓存 AI 理由",
+    });
+    expect(dataMocks.listPostsForMatching).not.toHaveBeenCalled();
+  });
+
+  it("scores instantly on cache miss and caches rule results for next visit", async () => {
+    dataMocks.listPostsForMatching.mockResolvedValue([
+      {
+        id: "post-1",
+        authorId: "other",
+        type: "partner",
+        title: "找全栈合伙人",
+        city: "上海",
+        tags: ["全栈", "AI大模型"],
+        bodyJson: {},
+      },
+    ]);
+
+    const result = await listRecommendationItems(user, 1);
+
+    expect(result.llmReady).toBe(false);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].post?.id).toBe("post-1");
+    expect(dataMocks.upsertRecommendations).toHaveBeenCalledWith("user-1", [
+      expect.objectContaining({ postId: "post-1", llm: false }),
+    ]);
+  });
+});
+
+describe("refreshRecommendationsWithLlm", () => {
+  it("generates LLM reasons and writes them to the cache", async () => {
+    dataMocks.listPostsForMatching.mockResolvedValue([
+      {
+        id: "post-1",
+        authorId: "other",
+        type: "partner",
+        title: "找全栈合伙人",
+        city: "上海",
+        tags: ["全栈", "AI大模型"],
+        bodyJson: {},
+      },
+    ]);
+    vi.stubEnv("OPENAI_COMPATIBLE_API_KEY", "test-key");
+    vi.stubEnv("OPENAI_COMPATIBLE_BASE_URL", "https://llm.example.com");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content: '[{"post_id":"post-1","reason":"技能匹配，值得沟通"}]',
+                  },
+                },
+              ],
+            }),
+          ),
+      ),
+    );
+
+    const result = await refreshRecommendationsWithLlm(user);
+
+    expect(result.count).toBe(1);
+    expect(dataMocks.upsertRecommendations).toHaveBeenCalledWith("user-1", [
+      expect.objectContaining({
+        postId: "post-1",
+        reason: "技能匹配，值得沟通",
+        llm: true,
+      }),
+    ]);
+  });
+
+  it("falls back to rule reasons when the LLM is unavailable", async () => {
+    dataMocks.listPostsForMatching.mockResolvedValue([
+      {
+        id: "post-1",
+        authorId: "other",
+        type: "partner",
+        title: "找全栈合伙人",
+        city: "上海",
+        tags: ["全栈", "AI大模型"],
+        bodyJson: {},
+      },
+    ]);
+    vi.stubEnv("OPENAI_COMPATIBLE_API_KEY", "test-key");
+    vi.stubEnv("OPENAI_COMPATIBLE_BASE_URL", "https://llm.example.com");
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new Error("LLM down");
+    }));
+
+    const result = await refreshRecommendationsWithLlm(user);
+
+    expect(result.count).toBe(1);
+    expect(dataMocks.upsertRecommendations).toHaveBeenCalledWith("user-1", [
+      expect.objectContaining({
+        postId: "post-1",
+        llm: true,
+        reason: expect.any(String),
+      }),
+    ]);
   });
 });

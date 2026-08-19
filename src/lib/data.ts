@@ -488,28 +488,32 @@ export type CachedRecommendation = {
   postId: string;
   score: number;
   reason: string;
+  llm: boolean;
 };
 
 export async function getCachedRecommendations(
   userId: string,
   since: Date,
+  limit = 6,
 ): Promise<CachedRecommendation[]> {
   const { data } = await supabase
     .from("sf_recommendations")
-    .select("post_id,score,reason")
+    .select("post_id,score,reason,llm")
     .eq("user_id", userId)
     .gte("created_at", since.toISOString())
     .order("score", { ascending: false })
     .order("created_at", { ascending: false })
-    .limit(6);
+    .limit(limit);
   return ((data ?? []) as unknown as Array<{
     post_id: string;
     score: number;
     reason: string;
+    llm: boolean;
   }>).map((row) => ({
     postId: row.post_id,
     score: Number(row.score) || 0,
     reason: row.reason ?? "",
+    llm: Boolean(row.llm),
   }));
 }
 
@@ -519,7 +523,7 @@ export async function getRecommendationForPost(
 ): Promise<CachedRecommendation | null> {
   const { data } = await supabase
     .from("sf_recommendations")
-    .select("post_id,score,reason")
+    .select("post_id,score,reason,llm")
     .eq("user_id", userId)
     .eq("post_id", postId)
     .maybeSingle();
@@ -528,12 +532,13 @@ export async function getRecommendationForPost(
     postId: data.post_id,
     score: Number(data.score) || 0,
     reason: data.reason ?? "",
+    llm: Boolean((data as { llm?: boolean }).llm),
   };
 }
 
 export async function upsertRecommendations(
   userId: string,
-  rows: Array<{ postId: string; score: number; reason: string }>,
+  rows: Array<{ postId: string; score: number; reason: string; llm?: boolean }>,
 ): Promise<void> {
   if (rows.length === 0) return;
   const { error } = await supabase
@@ -544,6 +549,9 @@ export async function upsertRecommendations(
         post_id: row.postId,
         score: row.score,
         reason: row.reason,
+        llm: row.llm ?? false,
+        // 刷新生成时间，避免 upsert 只更新内容、TTL 却永远停留在旧行
+        created_at: new Date().toISOString(),
       })),
       { onConflict: "user_id,post_id" },
     );
