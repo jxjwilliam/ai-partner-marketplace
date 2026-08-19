@@ -13,6 +13,7 @@ type DashboardData = {
   profile: {
     nickname: string;
     phone: string;
+    email: string | null;
     city: string;
     role: string;
     bio: string;

@@ -14,7 +14,7 @@ describe("集市首页", () => {
     expect(page).toContain("searchParams");
     expect(page).toContain('split(",")');
     expect(page).toContain("listPosts");
-    expect(page).toContain("countPostsByType");
+    expect(page).toContain("recommendForHome");
     expect(page).toContain("暂无帖子，来发布第一条");
     expect(page).toContain("<FilterBar");
     expect(page).toContain("<PostCard");
@@ -25,6 +25,7 @@ describe("集市首页", () => {
 
     expect(filterBar).toContain("CITIES");
     expect(filterBar).toContain("POST_TYPE_LABEL");
+    expect(filterBar).toContain("POST_FILTER_TYPES");
     expect(filterBar).toContain("TAGS");
     expect(filterBar).toContain("URLSearchParams");
     expect(filterBar).toContain('params.set("tags"');

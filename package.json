@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-  "dev": "next dev --turbopack -p 5600",
+    "dev": "next dev --turbopack -p 5600",
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
@@ -17,6 +17,7 @@
     "@alicloud/tea-util": "^1.4.11",
     "@supabase/supabase-js": "^2.112.3",
     "bcryptjs": "^3.0.3",
+    "lucide-react": "^1.32.0",
     "nanoid": "^6.0.0",
     "next": "15.5.21",
     "react": "19.1.0",

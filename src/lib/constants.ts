@@ -1,4 +1,14 @@
-export const CITIES = ["全部", "北京", "上海", "深圳", "杭州", "成都", "远程"] as const;
+export const CITIES = [
+  "全部",
+  "北京",
+  "上海",
+  "深圳",
+  "广州",
+  "杭州",
+  "成都",
+  "西安",
+  "远程",
+] as const;
 export const FILTER_CITIES = CITIES.filter((c) => c !== "全部");
 
 export const POST_TYPE_LABEL: Record<string, string> = {
@@ -31,6 +41,13 @@ export const OTP_MAX_SENDS_PER_IP_DAY = 20;
 export const UNLOCK_MAX_PENDING_PER_DAY = 5;
 export const UNLOCK_MIN_MESSAGE_LEN = 10;
 export const REPORT_EMAIL = "report@example.com"; // replace before launch
+
+/** 社区动态区（2026-08-18 修订） */
+export const COMMUNITY_POST_MAX_LEN = 1000;
+export const COMMUNITY_COMMENT_MAX_LEN = 500;
+export const COMMUNITY_MAX_POSTS_PER_DAY = 20;
+export const COMMUNITY_MAX_COMMENTS_PER_DAY = 50;
+export const COMMUNITY_PAGE_SIZE = 20;
 
 /** AI 请求（润色 / 推荐理由）最长等待时间 */
 export const AI_REQUEST_TIMEOUT_MS = 10_000;

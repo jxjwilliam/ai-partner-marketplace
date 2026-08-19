@@ -10,23 +10,26 @@
 
 - 登录页三 tab：手机号 OTP（阿里云短信；本地可用 `SMS_DRY_RUN`）+ 邮箱魔法链接 + Google 账号登录（Supabase Auth，首次登录自动注册）
 - 四类结构化帖子：找合伙人 / 我是人才 / 接项目 / 找资金
-- 城市、类型、标签筛选 + **关键词搜索** + **最新/热度排序** + **分页加载更多**
-- 分类入口卡片（实时数量）+ 发布者「已认证」徽章
+- 城市（北京/上海/深圳/广州/杭州/成都/西安/远程）、类型、标签筛选 + **关键词搜索** + **最新/热度排序** + **分页加载更多**
+- 首页双面价值入口（资深专业人士 / 企业·投资人）+ 信任标识；导航选中高亮 + lucide 图标；右上角显示登录账号（手机号/邮箱）
+- 帖子卡片按类型区分图标 + 发布者「已认证」徽章
 - 联系方式申请解锁（作者同意后才可见）
 - 发帖 AI 润色（采用 / 放弃；失败不影响发布）
 - **AI 匹配推荐**：首页「为你推荐」即时渲染（只读缓存/规则评分，不等待 LLM）；独立推荐页 `/recommendations`（支持手动刷新）生成 LLM 推荐理由并写入 30 分钟缓存，失败自动降级为规则文案；推荐帖详情页展示「AI 认为这条适合你」
+- **社区动态区** `/community`（2026-08-18 修订）：动态发布/评论 + 帖子详情评论区；评论与动态写入时自动脱敏联系方式，每日频控，作者可删除
 - 个人中心：我的帖子（隐藏/刷新）、解锁申请（收/发）、**技能方向与经验年限**
 - 管理员手机号可软隐藏垃圾帖
-- 品牌视觉：深蓝 `#1F3A5F` + 活力青 `#06B6D4`，专业极简商务风
+- 品牌视觉：深蓝 `#1F3A5F` + 活力青 `#06B6D4`，专业极简商务风（lucide-react 图标）
 
-**明确不做（v1）：** 微信登录/实名、站内私信、评论、全文搜索（Elasticsearch）、付费置顶、小程序、App。
+**明确不做（v1）：** 微信登录/实名、站内私信、全文搜索（Elasticsearch）、付费置顶、小程序、App。
+评论/社区已按 2026-08-18 设计修订纳入 v1.1（见设计文档修订节）。
 
 ## Stack
 
 | Layer | Choice |
 |-------|--------|
 | App | Next.js 15 (App Router) + React 19 + TypeScript |
-| UI | Tailwind CSS 4 |
+| UI | Tailwind CSS 4 + lucide-react 图标 |
 | DB | **Supabase 托管 PostgreSQL** + supabase-js（service_role，REST，表统一 `sf_` 前缀） |
 | Auth | Phone OTP + 邮箱魔法链接 + Google OAuth（Supabase Auth）；session token 存 **localStorage**，API 走 `Authorization: Bearer`（httpOnly cookie 仅作直连兜底，iframe 安全） |
 | SMS | 阿里云短信（Dysmsapi） |
@@ -73,7 +76,7 @@ npm run dev
 | `npm run build` / `npm start` | Production build & serve |
 | `npm test` | Vitest unit/route tests |
 | `npm run lint` | ESLint |
-| `npm run seed` | Seed demo users + posts |
+| `npm run seed` | Seed demo users + posts + community posts |
 
 ## Environment
 
@@ -93,7 +96,7 @@ Never commit `.env` / `.env.local`（两者均已 gitignore）。
 
 ```
 src/app/           # Routes & API (App Router)
-src/components/    # UI（SearchBox / FilterBar / PostCard / PostForm …）
+src/components/    # UI（SiteHeader / FilterBar / PostCard / CommunityComposer / CommentList …）
 src/lib/           # Auth, posts, unlock, AI helpers + data 数据访问层（supabase-js）
 src/tests/         # Vitest
 supabase/          # 迁移 SQL（sf_ 前缀）+ CLI 链接配置
@@ -121,12 +124,12 @@ docs/              # Specs, plans, research, deploy guide
 | 程序员客栈 | 中高端程序员接单/组队，项目经理拆单、12 小时启动 |
 | OPC 接单吧 / WeOPC | “一人公司”撮合，按行业场景分订单类型 |
 
-**已吸收：** 关键词搜索、分类入口、排序、分页、认证徽章、技能/年限画像。
-**暂缓（需外部资源或设计确认）：** AI 匹配推荐、双向意向、语义搜索、站内私信、微信登录。
+**已吸收：** 关键词搜索、城市/类型/标签筛选、排序、分页、认证徽章、技能/年限画像、社区动态与评论。
+**暂缓（需外部资源或设计确认）：** 双向意向、语义搜索、站内私信、微信登录。
 
 ## 关于 Python/FastAPI
 
-暂不引入。当前规模下 Next.js API Routes + Prisma 已覆盖全部业务（OTP、会话、帖子、解锁、AI 润色）；引入 FastAPI 会拆分部署与鉴权，得不偿失。若后续需要重计算（简历解析、向量检索、批量评测），再以独立服务方式接入。
+暂不引入。当前规模下 Next.js API Routes + supabase-js 数据层已覆盖全部业务（OTP、会话、帖子、解锁、AI 润色、社区动态与评论）；引入 FastAPI 会拆分部署与鉴权，得不偿失。若后续需要重计算（简历解析、向量检索、批量评测），再以独立服务方式接入。
 
 ## Docs
 
@@ -154,12 +157,8 @@ Private project (`package.json` `"private": true`).
 | --- | --- | --- |
 | ![Home](screenshots/home.png) | ![Post Detail](screenshots/post-detail.png) | ![Publish](screenshots/publish.png) |
 
-| Search | AI Recommendations | Recommendations |
-| --- | --- | --- |
-| ![Search](screenshots/home-search.png) | ![AI Recommendations](screenshots/home-recommendations.png) | ![Recommendations](screenshots/recommendations.png) |
-
-| Login | Me | |
-| --- | --- | --- |
-| ![Login](screenshots/login.png) | ![Me](screenshots/me.png) | |
+| Community | Login |
+| --- | --- |
+| ![Community](screenshots/community.png) | ![Login](screenshots/login.png) |
 
 <!-- /screenshots -->

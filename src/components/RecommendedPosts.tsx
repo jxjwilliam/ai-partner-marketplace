@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import { POST_TYPE_LABEL } from "@/lib/constants";
 import type { PostType } from "@/lib/types";
 
@@ -23,8 +24,9 @@ export default function RecommendedPosts({
   return (
     <section aria-label="AI 为你推荐" className="mb-6">
       <div className="mb-3 flex items-baseline gap-2">
-        <h2 className="text-base font-semibold text-[#1F3A5F]">
-          ✨ AI 为你推荐
+        <h2 className="flex items-center gap-1.5 text-base font-semibold text-[#1F3A5F]">
+          <Sparkles className="h-4 w-4 text-cyan-600" aria-hidden="true" />
+          AI 为你推荐
         </h2>
         <span className="text-xs text-slate-400">
           基于技能、城市与身份画像，30 分钟更新一次

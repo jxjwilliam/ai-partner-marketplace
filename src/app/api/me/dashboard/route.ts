@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
       profile: {
         nickname: user.nickname,
         phone: user.phone,
+        email: user.email,
         city: user.city,
         role: user.roleTag ? ROLE_LABELS[user.roleTag] : "身份待完善",
         bio: user.bio,

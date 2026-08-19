@@ -2,6 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import {
+  FileText,
+  Inbox,
+  Send,
+  UserRound,
+} from "lucide-react";
 import { apiFetch } from "@/lib/auth/client-session";
 
 type PostItem = {
@@ -44,6 +50,7 @@ export default function MeDashboard({
   profile: {
     nickname: string | null;
     phone: string;
+    email: string | null;
     city: string | null;
     role: string;
     bio: string | null;
@@ -84,11 +91,19 @@ export default function MeDashboard({
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
       <section className="border border-slate-200 bg-white p-5 sm:p-7">
         <p className="text-sm font-medium text-cyan-600">个人中心</p>
-        <h1 className="mt-2 text-2xl font-bold text-[#1F3A5F]">
+        <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold text-[#1F3A5F]">
+          <UserRound className="h-6 w-6 text-cyan-600" aria-hidden="true" />
           {profile.nickname ?? "集市用户"}
         </h1>
         <p className="mt-2 text-sm text-slate-500">
-          {[profile.role, profile.city, profile.phone].filter(Boolean).join(" · ")}
+          {[
+            profile.role,
+            profile.city,
+            profile.phone,
+            profile.email,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
         {profile.yearsExperience != null && (
           <p className="mt-1 text-sm text-slate-500">
@@ -120,7 +135,7 @@ export default function MeDashboard({
           ["requests", "联系方式申请"],
         ].map(([value, label]) => (
           <button
-            className={`border-b-2 px-5 py-3 text-sm font-semibold ${
+            className={`flex items-center gap-1.5 border-b-2 px-5 py-3 text-sm font-semibold ${
               tab === value
                 ? "border-cyan-600 text-cyan-700"
                 : "border-transparent text-slate-500"
@@ -129,6 +144,11 @@ export default function MeDashboard({
             onClick={() => setTab(value as typeof tab)}
             type="button"
           >
+            {value === "posts" ? (
+              <FileText className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Inbox className="h-4 w-4" aria-hidden="true" />
+            )}
             {label}
           </button>
         ))}
@@ -196,7 +216,10 @@ export default function MeDashboard({
       ) : (
         <div className="mt-5 grid gap-5 lg:grid-cols-2">
           <section>
-            <h2 className="mb-3 font-semibold text-slate-950">收到的申请</h2>
+            <h2 className="mb-3 flex items-center gap-1.5 font-semibold text-slate-950">
+              <Inbox className="h-4 w-4 text-cyan-600" aria-hidden="true" />
+              收到的申请
+            </h2>
             <div className="space-y-3">
               {incoming.length === 0 && (
                 <p className="border border-slate-200 bg-white p-5 text-sm text-slate-500">
@@ -240,7 +263,10 @@ export default function MeDashboard({
           </section>
 
           <section>
-            <h2 className="mb-3 font-semibold text-slate-950">发出的申请</h2>
+            <h2 className="mb-3 flex items-center gap-1.5 font-semibold text-slate-950">
+              <Send className="h-4 w-4 text-cyan-600" aria-hidden="true" />
+              发出的申请
+            </h2>
             <div className="space-y-3">
               {outgoing.length === 0 && (
                 <p className="border border-slate-200 bg-white p-5 text-sm text-slate-500">

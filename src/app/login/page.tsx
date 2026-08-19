@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Globe, Mail, Phone } from "lucide-react";
 import {
   apiFetch,
   getClientToken,
@@ -234,7 +235,7 @@ export default function LoginPage() {
           aria-label="登录方式"
         >
           <button
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition ${
               tab === "phone"
                 ? "bg-white text-slate-950 shadow-sm"
                 : "text-slate-500 hover:text-slate-800"
@@ -244,10 +245,11 @@ export default function LoginPage() {
             aria-selected={tab === "phone"}
             onClick={() => setTab("phone")}
           >
+            <Phone className="h-4 w-4" aria-hidden="true" />
             手机号登录
           </button>
           <button
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition ${
               tab === "email"
                 ? "bg-white text-slate-950 shadow-sm"
                 : "text-slate-500 hover:text-slate-800"
@@ -257,10 +259,11 @@ export default function LoginPage() {
             aria-selected={tab === "email"}
             onClick={() => setTab("email")}
           >
+            <Mail className="h-4 w-4" aria-hidden="true" />
             邮箱登录
           </button>
           <button
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition ${
               tab === "google"
                 ? "bg-white text-slate-950 shadow-sm"
                 : "text-slate-500 hover:text-slate-800"
@@ -270,6 +273,7 @@ export default function LoginPage() {
             aria-selected={tab === "google"}
             onClick={() => setTab("google")}
           >
+            <Globe className="h-4 w-4" aria-hidden="true" />
             Google 登录
           </button>
         </div>

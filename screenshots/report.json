@@ -6,13 +6,18 @@
       "status": "ok"
     },
     {
-      "name": "home",
-      "file": "screenshots/home.png",
+      "name": "posts_new",
+      "file": "screenshots/posts_new.png",
       "status": "ok"
     },
     {
-      "name": "home",
-      "file": "screenshots/home.png",
+      "name": "community",
+      "file": "screenshots/community.png",
+      "status": "ok"
+    },
+    {
+      "name": "login",
+      "file": "screenshots/login.png",
       "status": "ok"
     }
   ]

@@ -1,5 +1,9 @@
 import { supabase } from "@/lib/supabase";
-import { HOME_PAGE_SIZE, OTP_MAX_ATTEMPTS } from "@/lib/constants";
+import {
+  COMMUNITY_PAGE_SIZE,
+  HOME_PAGE_SIZE,
+  OTP_MAX_ATTEMPTS,
+} from "@/lib/constants";
 import { buildSearchClause } from "@/lib/posts/filters";
 import type {
   ContactRequest,
@@ -379,10 +383,7 @@ export async function listPosts(input: {
     "id,author_id,type,title,city,tags,body_json,view_count,status,created_at,bumped_at," +
     "sf_users!sf_posts_author_id_fkey(id,nickname,city,role_tag,is_verified)";
 
-  let query = supabase
-    .from("sf_posts")
-    .select(base, { count: "exact" })
-    .eq("status", "active");
+  let query = supabase.from("sf_posts").select(base).eq("status", "active");
   if (input.city) query = query.eq("city", input.city);
   if (input.type) query = query.eq("type", input.type);
   for (const tag of input.tags ?? []) {
@@ -860,4 +861,243 @@ export async function listOutgoingUnlocks(userId: string): Promise<
         }
       : null,
   }));
+}
+
+/* ── 社区动态区（2026-08-18 修订） ── */
+
+export type CommunityAuthor = {
+  id: string;
+  nickname: string | null;
+  city: string | null;
+  roleTag: RoleTag | null;
+  isVerified: boolean;
+};
+
+export type CommunityComment = {
+  id: string;
+  authorId: string;
+  body: string;
+  createdAt: Date;
+  author: CommunityAuthor | null;
+};
+
+export type CommunityPost = {
+  id: string;
+  authorId: string;
+  body: string;
+  createdAt: Date;
+  author: CommunityAuthor | null;
+  comments: CommunityComment[];
+};
+
+type CommunityAuthorRow = {
+  id: string;
+  nickname: string | null;
+  city: string | null;
+  role_tag: RoleTag | null;
+  is_verified: boolean;
+};
+
+const COMMUNITY_AUTHOR_SELECT =
+  "id,nickname,city,role_tag,is_verified";
+
+function toCommunityAuthor(row: CommunityAuthorRow | null): CommunityAuthor | null {
+  if (!row) return null;
+  return {
+    id: row.id,
+    nickname: row.nickname,
+    city: row.city,
+    roleTag: row.role_tag,
+    isVerified: row.is_verified,
+  };
+}
+
+export async function getCommunityPost(id: string): Promise<{
+  id: string;
+  authorId: string;
+  status: PostStatus;
+} | null> {
+  const { data } = await supabase
+    .from("sf_community_posts")
+    .select("id,author_id,status")
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) return null;
+  return { id: data.id, authorId: data.author_id, status: data.status };
+}
+
+export async function listCommunityPosts(input: {
+  page: number;
+}): Promise<{ posts: CommunityPost[]; hasMore: boolean }> {
+  const pageSize = COMMUNITY_PAGE_SIZE;
+  const postSelect = `id,author_id,body,created_at,sf_users!sf_community_posts_author_id_fkey(${COMMUNITY_AUTHOR_SELECT})`;
+  const commentSelect = `id,author_id,community_post_id,body,created_at,sf_users!sf_comments_author_id_fkey(${COMMUNITY_AUTHOR_SELECT})`;
+
+  const [postQuery, commentQuery] = await Promise.all([
+    supabase
+      .from("sf_community_posts")
+      .select(postSelect)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .range((input.page - 1) * pageSize, input.page * pageSize),
+    supabase
+      .from("sf_comments")
+      .select(commentSelect)
+      .eq("status", "active"),
+  ]);
+
+  const postRows = (postQuery.data ?? []) as unknown as Array<{
+    id: string;
+    author_id: string;
+    body: string;
+    created_at: string;
+    sf_users?: CommunityAuthorRow | null;
+  }>;
+  const hasMore = postRows.length > pageSize;
+  const pageRows = hasMore ? postRows.slice(0, pageSize) : postRows;
+  const postIds = new Set(pageRows.map((row) => row.id));
+
+  const commentRows = (commentQuery.data ?? []) as unknown as Array<{
+    id: string;
+    author_id: string;
+    community_post_id: string | null;
+    body: string;
+    created_at: string;
+    sf_users?: CommunityAuthorRow | null;
+  }>;
+  const commentsByPost = new Map<string, CommunityComment[]>();
+  for (const row of commentRows) {
+    if (!row.community_post_id || !postIds.has(row.community_post_id)) continue;
+    const item: CommunityComment = {
+      id: row.id,
+      authorId: row.author_id,
+      body: row.body,
+      createdAt: new Date(row.created_at),
+      author: toCommunityAuthor(row.sf_users ?? null),
+    };
+    const list = commentsByPost.get(row.community_post_id) ?? [];
+    list.push(item);
+    commentsByPost.set(row.community_post_id, list);
+  }
+
+  const posts = pageRows.map((row) => ({
+    id: row.id,
+    authorId: row.author_id,
+    body: row.body,
+    createdAt: new Date(row.created_at),
+    author: toCommunityAuthor(row.sf_users ?? null),
+    comments: (commentsByPost.get(row.id) ?? []).sort(
+      (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+    ),
+  }));
+  return { posts, hasMore };
+}
+
+export async function createCommunityPost(
+  authorId: string,
+  body: string,
+): Promise<{ id: string }> {
+  const { data, error } = await supabase
+    .from("sf_community_posts")
+    .insert({ author_id: authorId, body })
+    .select("id")
+    .single();
+  if (error || !data) throw new Error("发布动态失败");
+  return { id: data.id };
+}
+
+export async function deleteCommunityPost(
+  id: string,
+  authorId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("sf_community_posts")
+    .delete()
+    .eq("id", id)
+    .eq("author_id", authorId)
+    .select("id");
+  return (data?.length ?? 0) > 0;
+}
+
+export async function listCommentsForListingPost(
+  listingPostId: string,
+): Promise<CommunityComment[]> {
+  const { data } = await supabase
+    .from("sf_comments")
+    .select(
+      `id,author_id,body,created_at,sf_users!sf_comments_author_id_fkey(${COMMUNITY_AUTHOR_SELECT})`,
+    )
+    .eq("listing_post_id", listingPostId)
+    .eq("status", "active")
+    .order("created_at", { ascending: true });
+  return ((data ?? []) as unknown as Array<{
+    id: string;
+    author_id: string;
+    body: string;
+    created_at: string;
+    sf_users?: CommunityAuthorRow | null;
+  }>).map((row) => ({
+    id: row.id,
+    authorId: row.author_id,
+    body: row.body,
+    createdAt: new Date(row.created_at),
+    author: toCommunityAuthor(row.sf_users ?? null),
+  }));
+}
+
+export async function createComment(input: {
+  authorId: string;
+  communityPostId?: string;
+  listingPostId?: string;
+  body: string;
+}): Promise<{ id: string }> {
+  const { data, error } = await supabase
+    .from("sf_comments")
+    .insert({
+      author_id: input.authorId,
+      community_post_id: input.communityPostId ?? null,
+      listing_post_id: input.listingPostId ?? null,
+      body: input.body,
+    })
+    .select("id")
+    .single();
+  if (error || !data) throw new Error("发表评论失败");
+  return { id: data.id };
+}
+
+export async function deleteComment(
+  id: string,
+  authorId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("sf_comments")
+    .delete()
+    .eq("id", id)
+    .eq("author_id", authorId)
+    .select("id");
+  return (data?.length ?? 0) > 0;
+}
+
+export async function countCommunityPostsSince(
+  userId: string,
+  since: Date,
+): Promise<number> {
+  const { count } = await supabase
+    .from("sf_community_posts")
+    .select("id", { count: "exact", head: true })
+    .eq("author_id", userId)
+    .gte("created_at", since.toISOString());
+  return count ?? 0;
+}
+
+export async function countCommentsSince(
+  userId: string,
+  since: Date,
+): Promise<number> {
+  const { count } = await supabase
+    .from("sf_comments")
+    .select("id", { count: "exact", head: true })
+    .eq("author_id", userId)
+    .gte("created_at", since.toISOString());
+  return count ?? 0;
 }

@@ -10,6 +10,7 @@ function safeUser(user: User) {
   return {
     id: user.id,
     phone: user.phone,
+    email: user.email,
     nickname: user.nickname,
     city: user.city,
     roleTag: user.roleTag,

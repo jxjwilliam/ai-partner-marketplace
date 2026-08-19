@@ -1,7 +1,8 @@
 # AI合伙人集市 —— 双项目合并说明
 
 > 日期：2026-08-12
-> 状态：已实施（v1 完成，随 `senior-fusion-platform` 仓库维护）
+> 状态：已实施（v1 完成，随 `senior-fusion-platform` 仓库维护；2026-08-18 追加
+> 社区动态区/评论、首页双面价值入口、lucide 图标、城市扩充与导航高亮）
 > 生成：Codex（命名前缀遵循 docs/ 目录约定）
 
 ## 1. 背景与结论
@@ -26,7 +27,7 @@
 |--------|-----------|
 | 深蓝 `#1F3A5F` + 活力青 `#06B6D4` 专业商务视觉 | ✅ 全站统一（导航、卡片、按钮、表单、`globals.css` 品牌色变量） |
 | Hero 区 + 关键词搜索 | ✅ 首页 Hero + 搜索框；服务端搜索标题与 `intro/background/techNeeds/projectStage` |
-| 分类入口卡片 | ✅ 4 张（找合伙人/我是人才/接项目/找资金）+ 实时数量（`sf_post_counts` RPC） |
+| 分类入口卡片 | ❌ 2026-08-18 移除（与筛选栏「类型」重复）；类型筛选统一走 `FilterBar`（城市/类型/标签） |
 | 城市 / 标签筛选 | ✅ 保留并重设计（`FilterBar`） |
 | 排序下拉 | ✅ 最新发布 / 热度最高（“讨论最多”未做，见 §5） |
 | 帖子卡片：已认证徽章、浏览量、作者、相对时间 | ✅ `PostCard` 全部实现 |
@@ -56,11 +57,17 @@
 - **详情页推荐理由**：推荐帖详情页显示「✨ AI 认为这条适合你」。
 - **画像字段**：个人资料新增技能方向、经验年限，为匹配提供输入。
 
+**2026-08-18 追加**
+
+- **社区动态区** `/community`：动态发布/评论 + 帖子详情评论区；评论与动态写入时自动脱敏联系方式、每日频控、作者可删；新增 `sf_community_posts` / `sf_comments`。
+- **首页双面价值入口**：资深专业人士 / 企业·投资人 两卡片可点击直达对应类型筛选；导航选中高亮 + lucide-react 图标；右上角显示登录账号（手机号/邮箱）；城市新增广州、西安。
+- 首页与详情页数据库查询并行化，减少远程往返延迟。
+
 ## 6. 有意不做的取舍
 
 | 项 | 原因 |
 |----|------|
-| 评论 / “讨论最多”排序 | 设计规范 v1 明确不做评论；marketplace 的评论数是 mock |
+| 评论 | 2026-08-18 修订移入 v1.1 社区动态区（已实现）；“讨论最多”排序仍未做 |
 | 暗色主题切换 | 产品定为亮色专业商务风 |
 | Manus 登录、Google Maps | 外部集成需单独确认；城市级信息板用不上地图 |
 | shadcn/ui 全套组件库 | marketplace 是演示原型；新应用保持轻量 Tailwind 组件 |
@@ -72,7 +79,7 @@
 - Next.js 15（App Router）+ React 19 + Tailwind CSS 4；生产部署到阿里云 ECS/轻量。
 - 数据库：Supabase 托管 PostgreSQL，表统一 `sf_` 前缀；迁移 SQL 在 `supabase/migrations/`，用 `supabase db query --linked` 应用。
 - 数据访问：全部集中在 `src/lib/data.ts`（supabase-js + service_role）；路由不直接拼 REST。
-- LLM：`OPENAI_COMPATIBLE_BASE_URL/API_KEY/MODEL`（DeepSeek），润色与匹配均带 15s 超时与联系信息脱敏。
+- LLM：`OPENAI_COMPATIBLE_BASE_URL/API_KEY/MODEL`（DeepSeek），润色与匹配均带 10s 超时（`AI_REQUEST_TIMEOUT_MS`）与联系信息脱敏。
 - 环境变量：`.env.local` 仅保留 Supabase keys、DeepSeek、短信、`ADMIN_PHONES`；`.env` / `.env.local` 均 gitignore。
 
 ## 8. 相关文件

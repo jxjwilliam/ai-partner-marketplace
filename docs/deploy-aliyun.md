@@ -52,7 +52,8 @@ npm run build
 npm run seed
 ```
 
-种子脚本会幂等写入两个虚构账号和演示帖子。正式邀请用户前检查内容是否展示正常。
+种子脚本会幂等写入两个虚构账号、14 条演示帖子与 3 条社区动态（含示例评论）。
+正式邀请用户前检查内容是否展示正常。
 
 表结构变更：把 SQL 追加到 `supabase/migrations/` 后执行
 `supabase db query --linked --file supabase/migrations/<file>.sql`（需要本地 CLI 已 `supabase login`）。Supabase 自带自动备份与按时间点恢复；变更前在 Dashboard 创建手动备份，并定期演练恢复流程。

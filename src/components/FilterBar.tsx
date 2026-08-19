@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LayoutGrid, MapPin, Tag } from "lucide-react";
 import { CITIES, POST_TYPE_LABEL, TAGS } from "@/lib/constants";
 import { POST_FILTER_TYPES } from "@/lib/posts/filters";
 
@@ -46,7 +47,8 @@ export default function FilterBar({
       className="rounded-2xl border border-slate-200 bg-white text-sm shadow-sm"
     >
       <div className="flex overflow-hidden rounded-t-2xl border-b border-slate-100">
-        <span className="w-16 shrink-0 bg-slate-50 px-3 py-3 font-medium text-slate-500">
+        <span className="flex w-20 shrink-0 items-center gap-1.5 bg-slate-50 px-3 py-3 font-medium text-slate-500">
+          <MapPin className="h-4 w-4" aria-hidden="true" />
           城市
         </span>
         <div className="flex flex-wrap gap-x-1 gap-y-2 px-3 py-2">
@@ -71,7 +73,8 @@ export default function FilterBar({
       </div>
 
       <div className="flex border-b border-slate-100">
-        <span className="w-16 shrink-0 bg-slate-50 px-3 py-3 font-medium text-slate-500">
+        <span className="flex w-20 shrink-0 items-center gap-1.5 bg-slate-50 px-3 py-3 font-medium text-slate-500">
+          <LayoutGrid className="h-4 w-4" aria-hidden="true" />
           类型
         </span>
         <div className="flex flex-wrap gap-x-1 gap-y-2 px-3 py-2">
@@ -96,7 +99,8 @@ export default function FilterBar({
       </div>
 
       <div className="flex">
-        <span className="w-16 shrink-0 bg-slate-50 px-3 py-3 font-medium text-slate-500">
+        <span className="flex w-20 shrink-0 items-center gap-1.5 bg-slate-50 px-3 py-3 font-medium text-slate-500">
+          <Tag className="h-4 w-4" aria-hidden="true" />
           标签
         </span>
         <div className="flex flex-wrap gap-x-1 gap-y-2 px-3 py-2">

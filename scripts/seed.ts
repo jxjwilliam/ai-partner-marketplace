@@ -297,6 +297,52 @@ const posts: SeedPost[] = [
   },
 ];
 
+type SeedComment = {
+  id: string;
+  authorPhone: string;
+  body: string;
+};
+
+type SeedCommunityPost = {
+  id: string;
+  authorPhone: string;
+  body: string;
+  comments: SeedComment[];
+};
+
+const communityPosts: SeedCommunityPost[] = [
+  {
+    id: "seed-community-01",
+    authorPhone: users[1].phone,
+    body: "做全栈十年，最近帮两个创业团队评估 LLM 落地方案，踩了三个共同的坑：一是先定场景再选模型，不要上来就微调；二是知识库类需求 80% 的问题出在切分和召回，不在模型；三是上线前一定要想清楚怎么评测，不然永远在“感觉差不多”。有同感的朋友欢迎交流。",
+    comments: [
+      {
+        id: "seed-comment-01",
+        authorPhone: users[0].phone,
+        body: "深有同感。评测这件事尤其重要，建议从第一天就把 badcase 收集起来，后面迭代才有依据。",
+      },
+    ],
+  },
+  {
+    id: "seed-community-02",
+    authorPhone: users[0].phone,
+    body: "作为项目方复盘：AI 合伙人项目启动 90 天，最关键的其实不是技术，而是有没有真实行业数据和愿意付费的试点客户。技术伙伴看得再多，也比不上一个肯签单的种子客户。给正在找合伙人的朋友们一个建议：先证明需求，再谈分工。",
+    comments: [
+      {
+        id: "seed-comment-02",
+        authorPhone: users[1].phone,
+        body: "很认同。我在集市里找项目时，也会优先看有没有试点客户或明确场景，纯概念的项目一般不太敢接。",
+      },
+    ],
+  },
+  {
+    id: "seed-community-03",
+    authorPhone: users[1].phone,
+    body: "抛个问题：有做过企业级 RAG 知识库的朋友吗？多租户场景下文档权限隔离大家是怎么做的？可以分享下经验，回头我整理成一篇踩坑笔记发出来。",
+    comments: [],
+  },
+];
+
 async function main() {
   const userIds = new Map<string, string>();
 
@@ -344,7 +390,56 @@ async function main() {
     }
   }
 
-  console.log(`Seeded ${users.length} users and ${posts.length} posts.`);
+  for (const item of communityPosts) {
+    const authorId = userIds.get(item.authorPhone);
+    if (!authorId) throw new Error(`缺少作者: ${item.authorPhone}`);
+    const postRow = {
+      author_id: authorId,
+      body: item.body,
+      status: "active",
+    };
+    const { data: existingPost } = await supabase
+      .from("sf_community_posts")
+      .select("id")
+      .eq("id", item.id)
+      .maybeSingle();
+    if (existingPost) {
+      await supabase.from("sf_community_posts").update(postRow).eq("id", item.id);
+    } else {
+      const { error } = await supabase
+        .from("sf_community_posts")
+        .insert({ id: item.id, ...postRow });
+      if (error) throw new Error(`创建动态失败: ${item.id} (${error.message})`);
+    }
+
+    for (const comment of item.comments) {
+      const commenterId = userIds.get(comment.authorPhone);
+      if (!commenterId) throw new Error(`缺少评论者: ${comment.authorPhone}`);
+      const commentRow = {
+        community_post_id: item.id,
+        author_id: commenterId,
+        body: comment.body,
+        status: "active",
+      };
+      const { data: existingComment } = await supabase
+        .from("sf_comments")
+        .select("id")
+        .eq("id", comment.id)
+        .maybeSingle();
+      if (existingComment) {
+        await supabase.from("sf_comments").update(commentRow).eq("id", comment.id);
+      } else {
+        const { error } = await supabase
+          .from("sf_comments")
+          .insert({ id: comment.id, ...commentRow });
+        if (error) throw new Error(`创建评论失败: ${comment.id} (${error.message})`);
+      }
+    }
+  }
+
+  console.log(
+    `Seeded ${users.length} users, ${posts.length} posts, ${communityPosts.length} community posts.`,
+  );
 }
 
 main()

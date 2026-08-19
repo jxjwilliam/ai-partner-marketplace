@@ -34,7 +34,7 @@ Ship a China-mainland web MVP: a Craigslist-style information board where **35+/
 ### 1.3 Out of scope (v1)
 
 - WeChat scan login / real-name KYC
-- Discussion/comments (explicitly deferred; not in v1 acceptance)
+- ~~Discussion/comments~~ → 2026-08-18 修订：移入 v1.1 社区动态区（动态/评论已实现，见文末修订节）
 - Search (Elasticsearch), DMs, pin/pay, AI matching
 - Full admin console, mini-program, App
 - Redis (add only if list latency becomes a measured problem)
@@ -101,6 +101,7 @@ OSS (optional assets)   LLM API (润色 only)
 | `/posts/[id]` | Detail, publisher card, contact unlock CTA |
 | `/me` | Profile basics, my posts, unlock requests (in/out) |
 | `/login` | Phone + OTP / 邮箱魔法链接 / Google 登录 |
+| `/community` | 社区动态流：发布/评论动态（2026-08-18 修订） |
 
 ### 4.2 UI building blocks
 
@@ -110,6 +111,7 @@ OSS (optional assets)   LLM API (润色 only)
 - `ContactUnlockPanel` — request → pending / revealed / denied
 - `AiPolishBlock` — call API, show result, adopt/discard
 - `AuthGate` — write actions require login
+- `CommunityComposer` / `CommentList` / `DeleteButton` — 社区动态与评论（2026-08-18 修订）
 
 ### 4.3 Visual direction
 
@@ -142,6 +144,9 @@ id, author_id, type (`partner` | `talent` | `project` | `funding`), title, city,
 
 **`contact_requests`**  
 id, post_id, requester_id, message, status (`pending` | `approved` | `rejected`), created_at, decided_at
+
+> **2026-08-18 修订新增：** `sf_community_posts`（动态）、`sf_comments`（动态/帖子评论）——
+> 结构与规则见文末修订节 §12.3；迁移文件 `supabase/migrations/20260818223000_sf_community.sql`。
 
 ### 5.2 body_json templates (required fields)
 
@@ -239,8 +244,106 @@ Align with Kimi PRD templates; store extras in JSON:
 ## 10. Deferred (post-v1 only)
 
 - ICP filing and fully open public DNS
-- Comments/discussion
+- ~~Comments/discussion~~ → 已移入 v1.1 社区动态区（2026-08-18 修订）
 - WeChat login / real-name KYC
 - Serverless (FC) or mini-program
 - Email/SMS push for unlock decisions
 - Full-text search and paid pin
+
+---
+
+# 修订 2026-08-18 — 社区动态区（Community MVP）+ 双面市场定位
+
+> 状态：已实现 MVP。本修订覆盖第 1、2、10 节中与“评论/讨论”相关的旧约定
+> （评论区/动态区从 deferred 移入 v1.1 范围；其余 deferred 项不变）。
+
+## 11. 定位（双面市场，不是单边社区）
+
+平台同时服务两类用户，首页分别给出价值主张，但共用同一份帖子数据：
+
+| 一侧 | 谁来 | 为什么来 | 对应帖子类型 |
+|------|------|----------|--------------|
+| 资深专业人士（35+/10 年+） | 技术人、架构师、产品/运营老兵 | 找合伙人、接项目、被企业/项目方看见；资历前置、联系方式不裸奔 | 找合伙人、我是人才 |
+| 企业 / 投资人 | 创业项目方、企业用人方、投资机构 | 按技能/城市/类型精准筛选资深人才与真实项目，申请解锁直连 | 接项目、找资金 |
+
+平台特色保持三句话：**资历前置**（35+优先、10 年+、股权合伙）、**联系方式申请解锁**
+（隐私保护 + 意向过滤）、**只做信息撮合**（不介入交易、不背书）。
+
+## 12. 社区动态区（Community MVP）
+
+### 12.1 目的
+
+给资深技术人一个低门槛的交流空间：分享踩坑/经验、找队友、晒作品、提问。
+与帖子集市互补——帖子是结构化机会，动态是非结构化的“人在场”信号。
+评论统一复用一套表，同时支持动态评论和帖子详情评论。
+
+### 12.2 范围
+
+**In scope（本次实现）**
+
+- `/community` 动态流：登录用户发布文字动态，公开可读，新帖在前。
+- 动态评论 + 帖子详情评论：登录用户评论，公开可读。
+- 作者可删除自己的动态/评论；`status=hidden` 预留给管理员隐藏（软删除字段）。
+- 防垃圾：长度上限、每日条数上限、发布内容自动脱敏联系方式。
+
+**Out of scope（本次不做）**
+
+- 点赞/收藏/关注、富文本/图片、@提及、私信、搜索、完整论坛版块/子版。
+- 评论不承载联系方式解锁；联系方式仍只能通过 unlock 流程获得。
+
+### 12.3 数据模型（新增两张表）
+
+**`sf_community_posts`** — 动态
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | text (PK, gen_random_uuid) | |
+| author_id | text FK → sf_users.id (CASCADE) | |
+| body | text | 1–1000 字，写入前脱敏 |
+| status | PostStatus | active / hidden |
+| created_at | timestamptz | |
+
+**`sf_comments`** — 评论（动态评论或帖子评论二选一）
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| id | text (PK, gen_random_uuid) | |
+| author_id | text FK → sf_users.id (CASCADE) | |
+| community_post_id | text FK → sf_community_posts.id (CASCADE, nullable) | 动态评论 |
+| listing_post_id | text FK → sf_posts.id (CASCADE, nullable) | 帖子评论 |
+| body | text | 1–500 字，写入前脱敏 |
+| status | PostStatus | active / hidden |
+| created_at | timestamptz | |
+
+约束：`community_post_id` 与 `listing_post_id` 恰有一个非空（CHECK）。
+索引：FK 列 + 排序列（community_post_id, created_at / listing_post_id, created_at /
+author_id）。RLS 与既有 `sf_` 表一致：启用 RLS、无策略、仅 service_role 可读写。
+
+### 12.4 规则
+
+- 读写可见性：公开可读（匿名可看）；**写操作必须登录**。
+- 文本校验：trim 后非空；动态 ≤1000 字、评论 ≤500 字。
+- 脱敏：写入前复用 `scrubContactText`，手机号/邮箱/微信号替换为 `[已隐藏]`，
+  防止评论绕过 unlock 泄露联系方式。
+- 频率限制：每人每天动态 ≤20 条、评论 ≤50 条（计数基于 created_at 当日）。
+- 删除：作者可删自己的动态（级联删其评论）或评论；管理员后续用 status=hidden 隐藏。
+- 全站文案中文；错误提示中文；不发送评论内容给 LLM。
+
+### 12.5 页面与 API
+
+| 路径 | 方法 | 说明 |
+|------|------|------|
+| `/community` | GET | 动态流（SSR，分页 20/页，内嵌评论） |
+| `/api/community` | POST | 登录后发布动态 |
+| `/api/community/[id]` | DELETE | 删除自己的动态 |
+| `/api/comments` | POST | 登录后评论（targetType: community / listing） |
+| `/api/comments/[id]` | DELETE | 删除自己的评论 |
+| `/posts/[id]` | GET | 详情页新增评论区块（SSR 内嵌评论） |
+
+导航：顶栏新增「社区」入口（MessageSquare 图标，选中高亮）。
+
+### 12.6 风险与后续
+
+- 垃圾/人身攻击：MVP 靠长度 + 频率限制兜底，后续补管理员隐藏 API 与举报。
+- 内容安全（合规）：上线前建议接入机审（阿里云内容安全）扫描动态/评论；本次不实现。
+- 动态中的联系方式一律脱敏，避免“先看评论再决定要不要 unlock”破坏解锁闭环。

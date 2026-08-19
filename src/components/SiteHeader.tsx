@@ -1,10 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  Compass,
+  MessageSquare,
+  PenSquare,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
 import { useSessionUser } from "@/lib/auth/use-session-user";
 
 export default function SiteHeader() {
   const { user, loading } = useSessionUser();
+  const pathname = usePathname();
+
+  const isActive = (href: string, exact: boolean) =>
+    exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
@@ -30,34 +42,65 @@ export default function SiteHeader() {
           AI合伙人集市
         </Link>
         <nav
-          className="flex items-center gap-5 text-sm font-medium text-slate-600"
+          className="flex items-center gap-1.5 text-sm font-medium text-slate-600 sm:gap-2"
           aria-label="主导航"
         >
-          <Link className="transition hover:text-[#1F3A5F]" href="/">
+          <Link
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-2 transition ${
+              isActive("/", true)
+                ? "bg-[#1F3A5F]/10 font-semibold text-[#1F3A5F]"
+                : "text-slate-600 hover:bg-slate-100 hover:text-[#1F3A5F]"
+            }`}
+            href="/"
+          >
+            <Compass className="h-4 w-4" aria-hidden="true" />
             浏览
           </Link>
           <Link
-            className="transition hover:text-[#1F3A5F]"
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-2 transition ${
+              isActive("/posts/new", false)
+                ? "bg-[#1F3A5F]/10 font-semibold text-[#1F3A5F]"
+                : "text-slate-600 hover:bg-slate-100 hover:text-[#1F3A5F]"
+            }`}
             href="/posts/new"
           >
+            <PenSquare className="h-4 w-4" aria-hidden="true" />
             发布
+          </Link>
+          <Link
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-2 transition ${
+              isActive("/community", true)
+                ? "bg-[#1F3A5F]/10 font-semibold text-[#1F3A5F]"
+                : "text-slate-600 hover:bg-slate-100 hover:text-[#1F3A5F]"
+            }`}
+            href="/community"
+          >
+            <MessageSquare className="h-4 w-4" aria-hidden="true" />
+            社区
           </Link>
           {user && (
             <Link
-              className="transition hover:text-[#1F3A5F]"
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 transition ${
+                isActive("/recommendations", true)
+                  ? "bg-[#1F3A5F]/10 font-semibold text-[#1F3A5F]"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-[#1F3A5F]"
+              }`}
               href="/recommendations"
             >
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
               推荐
             </Link>
           )}
           <Link
-            className="rounded-lg bg-[#1F3A5F] px-3 py-2 text-white transition hover:bg-cyan-600"
+            className="flex max-w-44 items-center gap-1.5 truncate rounded-lg bg-[#1F3A5F] px-3 py-2 text-white transition hover:bg-cyan-600"
             href={user ? "/me" : "/login"}
+            title={user ? (user.phone ?? user.email ?? "个人中心") : "登录"}
           >
+            <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
             {loading
               ? "…"
               : user
-                ? user.nickname || "我的"
+                ? (user.phone ?? user.email ?? user.nickname ?? "我的")
                 : "登录"}
           </Link>
         </nav>

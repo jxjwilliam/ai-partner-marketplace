@@ -2,6 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **状态：历史计划文档（2026-07-21）。** 实际实现已偏离本文部分条目：数据库为
+> Supabase 托管 PostgreSQL + supabase-js（非 Prisma）；登录已新增邮箱魔法链接与 Google OAuth；
+> 评论/社区动态已按 2026-08-18 设计修订（见
+> `docs/superpowers/specs/2026-07-21-ai-partner-marketplace-design.md` 文末修订节）纳入 v1.1。
+> 后续以设计文档最新修订与代码为准。
+
 **Goal:** Build a China-mainland Craigslist-style web board (phone OTP, four post types, filters, contact unlock, AI polish) on Next.js + Aliyun RDS.
 
 **Architecture:** Next.js 15 App Router monolith on 阿里云 ECS/轻量; Server Actions/Route Handlers talk to PostgreSQL (Prisma); 阿里云短信 for OTP; mainland LLM for draft polish only; httpOnly session cookies.

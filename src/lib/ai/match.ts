@@ -1,6 +1,7 @@
 import type { PostType, User } from "@/lib/types";
 import {
   getCachedRecommendations,
+  getPostsByIds,
   listPostsForMatching,
   upsertRecommendations,
 } from "@/lib/data";
@@ -237,4 +238,71 @@ export async function recommendForUser(
   }));
   await upsertRecommendations(user.id, rows);
   return rows.slice(0, limit);
+}
+
+export type LightRecommendedPost = {
+  id: string;
+  type: PostType;
+  title: string;
+  city: string;
+};
+
+export type HomeRecommendation = {
+  post: LightRecommendedPost | null;
+  score: number;
+  reason: string;
+};
+
+/**
+ * 首页专用推荐：缓存读取与候选拉取并行，省掉一次串行 DB 往返。
+ * 缓存未命中时直接用规则评分结果渲染（不调 LLM、不写缓存），
+ * 命中时再按 ID 取帖子详情。
+ */
+export async function recommendForHome(
+  user: User,
+  limit = 3,
+): Promise<HomeRecommendation[]> {
+  const since = new Date(Date.now() - CACHE_TTL_MS);
+  const [cached, candidates] = await Promise.all([
+    getCachedRecommendations(user.id, since),
+    listPostsForMatching(user.id),
+  ]);
+
+  if (cached.length >= limit) {
+    const rows = cached.slice(0, limit);
+    const posts = await getPostsByIds(rows.map((item) => item.postId));
+    const byId = new Map(posts.map((post) => [post.id, post]));
+    return rows.map((item) => {
+      const post = byId.get(item.postId);
+      return {
+        post: post
+          ? {
+              id: post.id,
+              type: post.type,
+              title: post.title,
+              city: post.city,
+            }
+          : null,
+        score: item.score,
+        reason: item.reason,
+      };
+    });
+  }
+
+  const scored = candidates
+    .filter((post) => post.authorId !== user.id)
+    .map((post) => ({ post, detail: scorePostForUser(user, post) }))
+    .sort((a, b) => b.detail.score - a.detail.score)
+    .slice(0, limit);
+
+  return scored.map((item) => ({
+    post: {
+      id: item.post.id,
+      type: item.post.type,
+      title: item.post.title,
+      city: item.post.city,
+    },
+    score: item.detail.score,
+    reason: fallbackReason(item.detail),
+  }));
 }

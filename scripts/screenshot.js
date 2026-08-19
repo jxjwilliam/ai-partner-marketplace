@@ -40,7 +40,7 @@ function slugify(text) {
     .replace(/[^a-z0-9_-]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
-    || "home";
+    || "";
 }
 
 function ensureDir(dir) { fs.mkdirSync(dir, { recursive: true }); }
@@ -89,11 +89,10 @@ async function discoverRoutes(page, baseUrl, targetKey) {
 
   if (found.size > 1) {
     console.log(`  ✅ Found ${found.size} routes via nav links`);
-    return Array.from(found.entries()).map(([p, name]) => ({
-      path: p,
-      name: slugify(name) || slugify(p),
-      type: "route",
-    }));
+    return Array.from(found.entries()).map(([p, name]) => {
+      const slug = slugify(name) || slugify(p) || "home";
+      return { path: p, name: slug, type: "route" };
+    });
   }
 
   // Check for tab-based SPA (single page, multiple tabs)

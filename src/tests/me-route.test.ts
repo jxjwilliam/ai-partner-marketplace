@@ -21,6 +21,7 @@ import { GET, PATCH } from "@/app/api/me/route";
 const sessionUser = {
   id: "user-1",
   phone: "13800138000",
+  email: null,
   nickname: "小明",
   city: "上海",
   roleTag: "talent",
@@ -61,6 +62,7 @@ describe("GET /api/me", () => {
       user: {
         id: "user-1",
         phone: "13800138000",
+        email: null,
         nickname: "小明",
         city: "上海",
         roleTag: "talent",

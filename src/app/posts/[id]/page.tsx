@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ContactUnlockPanel from "@/components/ContactUnlockPanel";
+import CommentList, {
+  type CommentListItem,
+} from "@/components/CommentList";
 import { getSessionUser } from "@/lib/auth/session";
 import { POST_TYPE_LABEL } from "@/lib/constants";
 import {
@@ -8,6 +11,7 @@ import {
   getPostById,
   getUnlockStatus,
   incrementPostViews,
+  listCommentsForListingPost,
 } from "@/lib/data";
 import { shouldRevealContact } from "@/lib/posts/visibility";
 
@@ -54,8 +58,11 @@ export default async function PostDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const viewer = await getSessionUser();
-  const post = await getPostById(id);
+  const [viewer, post, listingComments] = await Promise.all([
+    getSessionUser(),
+    getPostById(id),
+    listCommentsForListingPost(id).catch(() => []),
+  ]);
 
   if (
     !post ||
@@ -66,17 +73,17 @@ export default async function PostDetailPage({
     notFound();
   }
 
-  const viewCount = await incrementPostViews(post.id);
-  let unlockStatus: "pending" | "approved" | "rejected" | null = null;
-  let recommendationReason: string | null = null;
-  if (viewer && viewer.id !== post.authorId) {
-    unlockStatus = await getUnlockStatus(post.id, viewer.id);
-    const recommendation = await getRecommendationForPost(
-      viewer.id,
-      post.id,
-    ).catch(() => null);
-    recommendationReason = recommendation?.reason ?? null;
-  }
+  const isViewerAuthor = Boolean(viewer && viewer.id === post.authorId);
+  const [viewCount, unlockStatus, recommendation] = await Promise.all([
+    incrementPostViews(post.id),
+    viewer && !isViewerAuthor
+      ? getUnlockStatus(post.id, viewer.id)
+      : Promise.resolve(null),
+    viewer && !isViewerAuthor
+      ? getRecommendationForPost(viewer.id, post.id).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+  const recommendationReason = recommendation?.reason ?? null;
   const revealContact = shouldRevealContact({
     viewerId: viewer?.id ?? null,
     authorId: post.authorId,
@@ -92,6 +99,18 @@ export default async function PostDetailPage({
   const fields = Object.entries(body)
     .map(([key, value]) => [key, displayValue(value)] as const)
     .filter(([, value]) => value);
+  const comments: CommentListItem[] = listingComments.map((comment) => ({
+    id: comment.id,
+    authorId: comment.authorId,
+    body: comment.body,
+    createdAt: comment.createdAt.toISOString(),
+    author: comment.author
+      ? {
+          nickname: comment.author.nickname,
+          isVerified: comment.author.isVerified,
+        }
+      : null,
+  }));
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">
@@ -175,6 +194,19 @@ export default async function PostDetailPage({
           </p>
         </aside>
       </div>
+
+      <section className="mt-6 border border-slate-200 bg-white p-5 sm:p-6">
+        <h2 className="text-base font-semibold text-[#1F3A5F]">
+          评论（{comments.length}）
+        </h2>
+        <CommentList
+          comments={comments}
+          targetType="listing"
+          targetId={post.id}
+          loggedIn={Boolean(viewer)}
+          currentUserId={viewer?.id ?? null}
+        />
+      </section>
     </main>
   );
 }

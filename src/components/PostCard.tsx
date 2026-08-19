@@ -1,4 +1,10 @@
 import Link from "next/link";
+import {
+  Banknote,
+  Briefcase,
+  Handshake,
+  UserRound,
+} from "lucide-react";
 import type { PostType } from "@/lib/types";
 import { POST_TYPE_LABEL } from "@/lib/constants";
 
@@ -7,6 +13,13 @@ const TYPE_STYLES: Record<PostType, string> = {
   talent: "bg-emerald-50 text-emerald-700",
   project: "bg-cyan-50 text-cyan-700",
   funding: "bg-amber-50 text-amber-700",
+};
+
+const TYPE_ICONS: Record<PostType, typeof Handshake> = {
+  partner: Handshake,
+  talent: UserRound,
+  project: Briefcase,
+  funding: Banknote,
 };
 
 export type PostCardPost = {
@@ -52,6 +65,7 @@ function timeAgo(date: Date): string {
 export default function PostCard({ post }: { post: PostCardPost }) {
   const snippet = snippetFrom(post.bodyJson);
   const verified = post.author?.isVerified;
+  const TypeIcon = TYPE_ICONS[post.type];
 
   return (
     <Link
@@ -61,8 +75,9 @@ export default function PostCard({ post }: { post: PostCardPost }) {
       <article className="rounded-xl border border-transparent px-3 py-2 transition group-hover:border-cyan-100 group-hover:shadow-sm sm:px-4">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span
-            className={`rounded-full px-2.5 py-1 font-semibold ${TYPE_STYLES[post.type]}`}
+            className={`flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${TYPE_STYLES[post.type]}`}
           >
+            <TypeIcon className="h-3.5 w-3.5" aria-hidden="true" />
             {POST_TYPE_LABEL[post.type]}
           </span>
           <span className="text-slate-500">{post.city}</span>

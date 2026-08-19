@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { Search } from "lucide-react";
 
 export default function SearchBox({
   defaultValue = "",
@@ -29,20 +30,10 @@ export default function SearchBox({
       role="search"
       aria-label="搜索合作信息"
     >
-      <svg
+      <Search
         aria-hidden="true"
         className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        viewBox="0 0 24 24"
-      >
-        <path
-          d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      />
       <input
         className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-12 pr-28 text-sm text-slate-900 shadow-sm outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100"
         value={value}
